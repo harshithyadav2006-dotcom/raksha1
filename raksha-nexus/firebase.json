@@ -1,0 +1,10 @@
+{
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "RAKSHA Nexus",
+        "supportEmail": "yadavhemanth28@gmail.com"
+      }
+    }
+  }
+}
