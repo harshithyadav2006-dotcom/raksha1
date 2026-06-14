@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { AnimatedHeading } from '../components/AnimatedHeading';
 import { FadeIn } from '../components/FadeIn';
 import { AlertCircle, AlertTriangle, ShieldCheck, MapPin, Info, Activity } from 'lucide-react';
+import { reportStore } from '../store/reportStore';
 
 const MOCK_MARKERS = [
   { id: 1, lat: 12.9716, lng: 77.5946, risk: 'critical', title: 'MG Road', type: 'Protest' },
@@ -31,15 +32,63 @@ const INCIDENT_TYPES = ['Assault Report', 'Accident', 'Riot', 'Gas Leak', 'Theft
 const LOCATIONS = ['Majestic', 'Hebbal', 'Yelahanka', 'Malleshwaram', 'BTM Layout', 'Banashankari', 'Rajajinagar'];
 const SEVERITIES = ['critical', 'high', 'medium', 'low'];
 
-const HEATMAP_ZONES = Array.from({ length: 16 }).map((_, i) => ({
-  id: i,
-  name: `Sector ${String.fromCharCode(65 + i)}`,
-  score: Math.floor(Math.random() * 100),
-  incidents: Math.floor(Math.random() * 8)
-}));
+const SEVERITY_SCORE: Record<string, number> = { critical: 100, high: 75, medium: 50, low: 25 };
 
 export const Dashboard: React.FC = () => {
   const [incidents, setIncidents] = useState(INITIAL_INCIDENTS);
+  const [userReports, setUserReports] = useState(() => reportStore.getAll());
+
+  // Subscribe to live public reports
+  useEffect(() => {
+    const load = () => setUserReports(reportStore.getAll());
+    load();
+    return reportStore.subscribe(load);
+  }, []);
+
+  // Convert user reports to the same format as incidents
+  const userIncidentFeed = userReports
+    .filter(r => r.status !== 'Dismissed')
+    .map(r => ({
+      id: r.id as any,
+      type: r.type,
+      location: r.location,
+      time: (() => {
+        const diff = Math.floor((Date.now() - new Date(r.reportedAt).getTime()) / 60000);
+        return diff < 1 ? 'just now' : diff < 60 ? `${diff}m ago` : `${Math.floor(diff / 60)}h ago`;
+      })(),
+      severity: (r.severity === 'Critical' ? 'critical' : r.severity === 'High' ? 'high' : r.severity === 'Medium' ? 'medium' : 'low'),
+      isPublic: true,
+    }));
+
+  const allIncidents = [...userIncidentFeed, ...incidents].slice(0, 12);
+
+  // Extra map markers from geolocated user reports
+  const userMapMarkers = userReports
+    .filter(r => r.coords && r.status !== 'Dismissed')
+    .map(r => ({
+      id: r.id,
+      lat: r.coords![0],
+      lng: r.coords![1],
+      risk: r.severity === 'Critical' || r.severity === 'High' ? 'critical' : r.severity === 'Medium' ? 'medium' : 'safe',
+      title: r.location,
+      type: r.type,
+      isPublic: true,
+    }));
+
+  // Derive live risk zones from the same incidents shown in Live Feed
+  const riskZones = useMemo(() => {
+    const map: Record<string, { totalScore: number; count: number }> = {};
+    allIncidents.forEach(inc => {
+      if (!map[inc.location]) map[inc.location] = { totalScore: 0, count: 0 };
+      map[inc.location].totalScore += SEVERITY_SCORE[inc.severity] ?? 25;
+      map[inc.location].count++;
+    });
+    return Object.entries(map).map(([name, data]) => ({
+      name,
+      score: Math.round(data.totalScore / data.count),
+      incidents: data.count,
+    }));
+  }, [allIncidents]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -69,6 +118,12 @@ export const Dashboard: React.FC = () => {
     return 'border-green-500/50 hover:bg-green-500/10';
   };
 
+  const getScoreColor = (score: number) => {
+    if (score > 75) return { text: 'text-red-400', bg: 'bg-red-500/10', label: 'CRITICAL', labelClass: 'bg-red-500/20 text-red-400 border-red-500/30' };
+    if (score > 40) return { text: 'text-amber-400', bg: 'bg-amber-500/10', label: 'ELEVATED', labelClass: 'bg-amber-500/20 text-amber-400 border-amber-500/30' };
+    return { text: 'text-green-400', bg: 'bg-green-500/10', label: 'SAFE', labelClass: 'bg-green-500/20 text-green-400 border-green-500/30' };
+  };
+
   const getSeverityBadge = (severity: string) => {
     const map: Record<string, string> = {
       critical: 'bg-red-500/20 text-red-400 border-red-500/30',
@@ -95,10 +150,10 @@ export const Dashboard: React.FC = () => {
       {/* STAT CARDS ROW */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
         {[
-          { label: 'Active Incidents', value: '12', trend: '+3 vs last hr', status: 'warning' },
+          { label: 'Active Incidents', value: String(allIncidents.filter(i => i.severity === 'critical' || i.severity === 'high').length), trend: 'LIVE', status: 'warning' },
           { label: 'Responders Deployed', value: '47', trend: 'LIVE', status: 'neutral' },
-          { label: 'SOS Alerts Today', value: '8', trend: '-2 vs yesterday', status: 'success' },
-          { label: 'Zones at Risk', value: '3', trend: 'CRITICAL', status: 'danger' },
+          { label: 'Public Reports', value: String(userReports.filter(r => r.status === 'Pending').length), trend: userReports.filter(r => r.status === 'Pending').length > 0 ? 'PENDING' : 'CLEAR', status: userReports.filter(r => r.status === 'Pending').length > 0 ? 'danger' : 'success' },
+          { label: 'Zones at Risk', value: String(new Set(allIncidents.filter(i => i.severity === 'critical').map(i => i.location)).size), trend: 'CRITICAL', status: 'danger' },
         ].map((stat, idx) => (
           <FadeIn key={idx} delay={400 + idx * 200}>
             <div className="liquid-glass border border-white/10 rounded-xl px-6 py-5 flex flex-col h-full hover:bg-white/[0.02] transition-colors">
@@ -125,14 +180,17 @@ export const Dashboard: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           
           {/* MAP */}
-          <div className="lg:col-span-2 h-[400px] lg:h-[500px] liquid-glass border border-white/10 rounded-xl overflow-hidden relative shadow-lg">
-            <div className="absolute top-4 left-4 z-[400] liquid-glass px-4 py-2 rounded-lg border border-white/10 text-xs font-semibold tracking-widest flex items-center gap-2 backdrop-blur-md">
+          <div className="lg:col-span-2 flex flex-col gap-2">
+            {/* Map Label */}
+            <div className="flex items-center gap-2 px-1">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
               </span>
-              GLOBAL VIEW
+              <span className="text-xs font-semibold tracking-widest text-white">GLOBAL VIEW</span>
             </div>
+            {/* Map Container */}
+            <div className="h-[400px] lg:h-[500px] liquid-glass border border-white/10 rounded-xl overflow-hidden relative shadow-lg">
             <MapContainer 
               center={[12.9716, 77.5946]} 
               zoom={11} 
@@ -155,18 +213,40 @@ export const Dashboard: React.FC = () => {
                   radius={8}
                 >
                   <Popup className="custom-popup">
-                    <div className="text-black p-1 min-w-[120px]">
-                      <h4 className="font-bold text-sm mb-1">{marker.title}</h4>
-                      <p className="text-xs text-gray-700 capitalize flex items-center justify-between">
+                    <div className="text-white p-1 min-w-[160px]">
+                      <h4 className="font-bold text-sm mb-2 text-white">{marker.title}</h4>
+                      <p className="text-xs text-gray-300 capitalize flex items-center justify-between gap-3">
                         <span>{marker.type}</span>
-                        <span className="font-bold" style={{ color: getMarkerColor(marker.risk) }}>{marker.risk}</span>
+                        <span className="font-bold shrink-0" style={{ color: getMarkerColor(marker.risk) }}>{marker.risk}</span>
                       </p>
                     </div>
                   </Popup>
                 </CircleMarker>
               ))}
+              {userMapMarkers.map(marker => (
+                <CircleMarker
+                  key={`public-${marker.id}`}
+                  center={[marker.lat, marker.lng]}
+                  pathOptions={{ 
+                    color: getMarkerColor(marker.risk), 
+                    fillColor: getMarkerColor(marker.risk), 
+                    fillOpacity: 0.9,
+                    weight: 3,
+                  }}
+                  radius={10}
+                >
+                  <Popup className="custom-popup">
+                    <div className="text-white p-1 min-w-[180px]">
+                      <div className="text-[9px] font-bold text-red-400 uppercase tracking-wider mb-1">📍 Public Report</div>
+                      <h4 className="font-bold text-sm mb-1 text-white">{marker.title}</h4>
+                      <p className="text-xs text-gray-300">{marker.type}</p>
+                    </div>
+                  </Popup>
+                </CircleMarker>
+              ))}
             </MapContainer>
-          </div>
+            </div>{/* end map container */}
+          </div>{/* end map wrapper */}
 
           {/* LIVE FEED */}
           <div className="liquid-glass border border-white/10 rounded-xl flex flex-col overflow-hidden h-[500px]">
@@ -176,10 +256,12 @@ export const Dashboard: React.FC = () => {
             </div>
             <div className="flex-1 overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
               <div className="flex flex-col gap-2">
-                {incidents.map((incident) => (
+                {allIncidents.map((incident, idx) => (
                   <div 
-                    key={incident.id} 
-                    className="p-4 rounded-lg bg-black/40 border border-white/5 hover:border-white/10 transition-all flex gap-4 items-start animate-[slideIn_0.3s_ease-out]"
+                    key={`${incident.id}-${idx}`} 
+                    className={`p-4 rounded-lg border transition-all flex gap-4 items-start animate-[slideIn_0.3s_ease-out] ${
+                      (incident as any).isPublic ? 'bg-red-500/5 border-red-500/20' : 'bg-black/40 border-white/5 hover:border-white/10'
+                    }`}
                   >
                     <div className={`mt-1 shrink-0 ${incident.severity === 'critical' ? 'text-red-400' : 'text-gray-400'}`}>
                       {incident.severity === 'critical' || incident.severity === 'high' ? <AlertTriangle size={18} /> : 
@@ -187,7 +269,12 @@ export const Dashboard: React.FC = () => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start mb-1">
-                        <h4 className="text-sm font-medium text-white truncate pr-2">{incident.type}</h4>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <h4 className="text-sm font-medium text-white truncate">{incident.type}</h4>
+                          {(incident as any).isPublic && (
+                            <span className="text-[8px] font-bold bg-red-500/20 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0">PUBLIC</span>
+                          )}
+                        </div>
                         <span className="text-[10px] text-gray-500 border border-white/10 px-1.5 py-0.5 rounded shrink-0">{incident.time}</span>
                       </div>
                       <div className="flex flex-col gap-2 mt-2">
@@ -211,32 +298,43 @@ export const Dashboard: React.FC = () => {
         </div>
       </FadeIn>
 
-      {/* DISASTER HEATMAP ROW */}
+      {/* RISK SCORE ROW */}
       <FadeIn delay={1400}>
         <div>
           <h3 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
             <ShieldCheck size={18} className="text-gray-400" />
-            Zone Heatmap Array
+            RISK SCORE
           </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8 gap-3">
-            {HEATMAP_ZONES.map(zone => (
-              <div 
-                key={zone.id} 
-                className={`liquid-glass rounded-lg border p-4 cursor-pointer transition-all border-l-4 group relative ${getHeatmapBorder(zone.score)}`}
-                style={{ borderLeftWidth: '4px' }}
-              >
-                <div className="flex flex-col mb-1 relative z-10">
-                  <span className="text-xs text-gray-400 font-mono mb-1">{zone.name}</span>
-                  <span className="text-xl font-light text-white">{zone.score}<span className="text-xs text-gray-500">/100</span></span>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {riskZones.map(zone => {
+              const sc = getScoreColor(zone.score);
+              return (
+                <div
+                  key={zone.name}
+                  className={`rounded-xl border border-l-4 p-4 cursor-pointer transition-all group relative ${getHeatmapBorder(zone.score)} ${sc.bg}`}
+                  style={{ borderLeftWidth: '4px' }}
+                >
+                  {/* City name + status pill */}
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-white font-medium truncate pr-1">{zone.name}</span>
+                    <span className={`text-[9px] font-bold border px-1.5 py-0.5 rounded-full shrink-0 tracking-wider ${sc.labelClass}`}>
+                      {sc.label}
+                    </span>
+                  </div>
+                  {/* Score number */}
+                  <span className={`text-2xl font-semibold ${sc.text}`}>
+                    {zone.score}
+                    <span className="text-xs text-gray-500 font-normal">/100</span>
+                  </span>
+
+                  {/* TOOLTIP */}
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 bg-black border border-white/20 text-white text-xs px-3 py-2 rounded shadow-xl opacity-0 group-hover:opacity-100 group-hover:-translate-y-1 transition-all pointer-events-none whitespace-nowrap z-50">
+                    Active Incidents: {zone.incidents}
+                    <div className="absolute left-1/2 -translate-x-1/2 top-full border-4 border-transparent border-t-white/20"></div>
+                  </div>
                 </div>
-                
-                {/* TOOLTIP */}
-                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 bg-black border border-white/20 text-white text-xs px-3 py-2 rounded shadow-xl opacity-0 group-hover:opacity-100 group-hover:-translate-y-1 transition-all pointer-events-none whitespace-nowrap z-50">
-                  Active Incidents: {zone.incidents}
-                  <div className="absolute left-1/2 -translate-x-1/2 top-full border-4 border-transparent border-t-white/20"></div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </FadeIn>

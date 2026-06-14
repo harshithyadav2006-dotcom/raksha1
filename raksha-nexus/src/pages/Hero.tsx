@@ -20,22 +20,22 @@ export const Hero: React.FC = () => {
       <div className="relative z-10 flex flex-col w-full h-full flex-1">
         {/* NAVBAR */}
         <nav className="w-full px-6 md:px-12 lg:px-16 pt-6">
-          <div className="liquid-glass rounded-xl px-4 py-2 flex items-center justify-between">
+          <div className="liquid-glass rounded-xl px-4 py-2 flex items-center justify-between relative">
             {/* Left */}
             <div className="text-2xl font-semibold tracking-tight">RAKSHA</div>
             
-            {/* Center */}
-            <div className="hidden md:flex items-center gap-8">
+            {/* Center — absolutely centered */}
+            <div className="hidden md:flex items-center gap-8 absolute left-1/2 -translate-x-1/2">
               <Link to="/dashboard" className="text-sm text-white hover:text-gray-300 transition-colors">Dashboard</Link>
               <Link to="/crisis" className="text-sm text-white hover:text-gray-300 transition-colors">Crisis</Link>
               <Link to="/women-safety" className="text-sm text-white hover:text-gray-300 transition-colors">Women Safety</Link>
-              <Link to="/admin" className="text-sm text-white hover:text-gray-300 transition-colors">Admin</Link>
+              <Link to="/public-tools?tab=report" className="text-sm text-white hover:text-gray-300 transition-colors font-medium border border-transparent hover:border-red-500/20 px-2 py-0.5 rounded transition-all bg-red-500/10 text-red-200">Report Crisis</Link>
             </div>
             
             {/* Right */}
             <div>
-              <Link to="/login" className="bg-white text-black px-6 py-2 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors">
-                Enter Platform
+              <Link to="/admin" className="bg-white text-black px-6 py-2 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors">
+                Admin
               </Link>
             </div>
           </div>
@@ -57,13 +57,10 @@ export const Hero: React.FC = () => {
                 </p>
               </FadeIn>
               <FadeIn delay={1200}>
-                <div className="flex flex-col sm:flex-row items-start gap-4">
-                  <Link to="/login" className="bg-white text-black px-8 py-3 rounded-lg font-medium hover:bg-gray-100 transition-colors">
-                    Enter Platform
-                  </Link>
-                  <button className="liquid-glass border border-white/20 text-white px-8 py-3 rounded-lg font-medium hover:bg-white hover:text-black transition-all">
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  <Link to="/dashboard" className="liquid-glass border border-white/20 text-white px-8 py-3 rounded-lg font-medium hover:bg-white hover:text-black transition-all">
                     See How It Works
-                  </button>
+                  </Link>
                 </div>
               </FadeIn>
             </div>

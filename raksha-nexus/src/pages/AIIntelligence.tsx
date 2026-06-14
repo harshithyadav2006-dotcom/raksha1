@@ -62,7 +62,7 @@ const PREDICTIVE_DATA_HOURLY = Array.from({ length: 24 }).map((_, i) => ({
 }));
 
 
-export const AIIntelligence: React.FC = () => {
+export const AIIntelligence: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   // 1. Grid
   const [gridData, setGridData] = useState(generateGrid());
   const [isRecalculating, setIsRecalculating] = useState(false);
@@ -178,14 +178,16 @@ export const AIIntelligence: React.FC = () => {
 
 
   return (
-    <div className="flex flex-col w-full text-white min-h-screen">
-      {/* PAGE HEADER */}
-      <div className="mb-10">
-        <AnimatedHeading text={"AI\nIntelligence."} className="text-3xl md:text-4xl lg:text-5xl font-normal mb-2 tracking-[-0.04em] leading-tight" />
-        <FadeIn delay={200}>
-          <p className="text-sm md:text-base text-gray-400">Predictive threat analysis, anomaly detection, and smart resource optimization.</p>
-        </FadeIn>
-      </div>
+    <div className={`flex flex-col w-full text-white ${embedded ? '' : 'min-h-screen'}`}>
+      {/* PAGE HEADER — hidden when embedded in Admin Panel */}
+      {!embedded && (
+        <div className="mb-10">
+          <AnimatedHeading text={"AI\nIntelligence."} className="text-3xl md:text-4xl lg:text-5xl font-normal mb-2 tracking-[-0.04em] leading-tight" />
+          <FadeIn delay={200}>
+            <p className="text-sm md:text-base text-gray-400">Predictive threat analysis, anomaly detection, and smart resource optimization.</p>
+          </FadeIn>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
         {/* LEFT COLUMN */}

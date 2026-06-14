@@ -1,17 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { AnimatedHeading } from '../components/AnimatedHeading';
 import { FadeIn } from '../components/FadeIn';
 import { 
-  Phone, ShieldAlert, Plus, Edit2, Trash2, 
-  Download, CheckCircle, Mic, MicOff, Navigation, X
+  Phone, ShieldAlert, CheckCircle, Mic, MicOff, X,
+  AlertTriangle, Camera, MapPin, Upload, Flame, Activity,
+  Droplets, Users, Shield, Zap, ChevronRight
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
-import { motion, AnimatePresence } from 'framer-motion';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { QRCodeSVG } from 'qrcode.react';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 import toast, { Toaster } from 'react-hot-toast';
+import { reportStore } from '../store/reportStore';
+import type { ReportSeverity } from '../store/reportStore';
 
 // Leaflet default icon fix
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -21,100 +24,123 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-const TABS = ['Nearby Finder', 'Contact Vault', 'Anonymous Report', 'Voice Assistant'];
+const TABS = ['Nearby Finder', 'Crisis Report', 'Voice Assistant'];
+
+const CRISIS_TYPES = [
+  { label: 'Fire & Smoke',       icon: Flame,         color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/30' },
+  { label: 'Flood',              icon: Droplets,      color: 'text-blue-400',   bg: 'bg-blue-500/10 border-blue-500/30' },
+  { label: 'Violence / Assault', icon: ShieldAlert,   color: 'text-red-400',    bg: 'bg-red-500/10 border-red-500/30' },
+  { label: 'Medical Emergency',  icon: Activity,      color: 'text-pink-400',   bg: 'bg-pink-500/10 border-pink-500/30' },
+  { label: 'Crowd / Stampede',   icon: Users,         color: 'text-amber-400',  bg: 'bg-amber-500/10 border-amber-500/30' },
+  { label: 'Security Threat',    icon: Shield,        color: 'text-purple-400', bg: 'bg-purple-500/10 border-purple-500/30' },
+  { label: 'Power Outage',       icon: Zap,           color: 'text-yellow-400', bg: 'bg-yellow-500/10 border-yellow-500/30' },
+  { label: 'Other',              icon: AlertTriangle, color: 'text-gray-400',   bg: 'bg-white/5 border-white/20' },
+];
 
 // --- Mock Data ---
 const HOSPITALS = [
-  { id: 1, name: 'Manipal Hospital', distance: '1.2 km', address: '98 HAL Old Airport Rd', phone: '080-2502-3344', open: true, coords: [12.959, 77.648] as [number, number] },
+  { id: 1, name: 'Manipal Hospital', distance: '1.2 km', address: '98 HAL Old Airport Rd', phone: '080-2222-1111', open: true, coords: [12.959, 77.648] as [number, number] },
   { id: 2, name: 'Fortis Hospital', distance: '2.5 km', address: '154/9 Bannerghatta Road', phone: '080-6621-4444', open: true, coords: [12.894, 77.598] as [number, number] },
   { id: 3, name: 'Apollo Hospitals', distance: '3.1 km', address: '154/11 Bannerghatta Road', phone: '080-2630-4050', open: true, coords: [12.895, 77.599] as [number, number] },
-  { id: 4, name: 'St. John\'s Medical', distance: '3.8 km', address: 'Sarjapur Road, Koramangala', phone: '080-2206-5000', open: true, coords: [12.929, 77.618] as [number, number] },
+  { id: 4, name: 'St. John\'s Medical', distance: '3.8 km', address: 'Sarjapur Road, Koramangala', phone: '080-2206-5003', open: true, coords: [12.929, 77.618] as [number, number] },
   { id: 5, name: 'Sakra World Hospital', distance: '5.0 km', address: 'Devarabeesanahalli Varthur Hobli', phone: '080-4969-4969', open: true, coords: [12.932, 77.684] as [number, number] },
   { id: 6, name: 'Bowring and Lady Curzon', distance: '5.2 km', address: 'Lady Curzon Rd, Shivaji Nagar', phone: '080-2559-1362', open: false, coords: [12.982, 77.602] as [number, number] },
 ];
 
 const POLICE_STATIONS = [
-  { id: 1, name: 'Indiranagar Police Station', distance: '0.8 km', address: '100 Feet Rd, Indiranagar', phone: '100', open: true, coords: [12.978, 77.640] as [number, number] },
-  { id: 2, name: 'Koramangala Police', distance: '2.1 km', address: 'Koramangala 8th Block', phone: '100', open: true, coords: [12.938, 77.615] as [number, number] },
-  { id: 3, name: 'Ashok Nagar Police', distance: '3.5 km', address: 'Shoppers Stop, MG Road', phone: '100', open: true, coords: [12.972, 77.608] as [number, number] },
-  { id: 4, name: 'Halasuru Police Station', distance: '4.2 km', address: 'Old Madras Road', phone: '100', open: true, coords: [12.976, 77.625] as [number, number] },
-  { id: 5, name: 'Viveknagar Police', distance: '4.8 km', address: 'Viveknagar Main Rd', phone: '100', open: true, coords: [12.955, 77.619] as [number, number] },
-  { id: 6, name: 'Cubbon Park Police', distance: '5.5 km', address: 'Kasturba Road', phone: '100', open: true, coords: [12.977, 77.596] as [number, number] },
+  { id: 1, name: 'Indiranagar Police Station', distance: '0.8 km', address: '100 Feet Rd, Indiranagar', phone: '080-2294-2541', open: true, coords: [12.978, 77.640] as [number, number] },
+  { id: 2, name: 'Koramangala Police', distance: '2.1 km', address: 'Koramangala 8th Block', phone: '080-2553-7777', open: true, coords: [12.938, 77.615] as [number, number] },
+  { id: 3, name: 'Ashok Nagar Police', distance: '3.5 km', address: 'Shoppers Stop, MG Road', phone: '080-2294-2580', open: true, coords: [12.972, 77.608] as [number, number] },
+  { id: 4, name: 'Halasuru Police Station', distance: '4.2 km', address: 'Old Madras Road', phone: '080-2557-4821', open: true, coords: [12.976, 77.625] as [number, number] },
+  { id: 5, name: 'Viveknagar Police', distance: '4.8 km', address: 'Viveknagar Main Rd', phone: '080-2294-2584', open: true, coords: [12.955, 77.619] as [number, number] },
+  { id: 6, name: 'Cubbon Park Police', distance: '5.5 km', address: 'Kasturba Road', phone: '080-2294-2591', open: true, coords: [12.977, 77.596] as [number, number] },
 ];
 
+const LocationPicker: React.FC<{
+  coords: [number, number] | null;
+  setCoords: (coords: [number, number]) => void;
+}> = ({ coords, setCoords }) => {
+  useMapEvents({
+    click(e) {
+      setCoords([e.latlng.lat, e.latlng.lng]);
+    }
+  });
+  return coords ? <Marker position={coords} /> : null;
+};
+
 export const PublicTools: React.FC = () => {
-  const [activeTab, setActiveTab] = useState(TABS[0]);
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState(() => {
+    const searchParams = new URLSearchParams(location.search);
+    return searchParams.get('tab') === 'report' ? 'Crisis Report' : TABS[0];
+  });
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    if (searchParams.get('tab') === 'report') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setActiveTab('Crisis Report');
+    }
+  }, [location.search]);
 
   // --- NEARBY FINDER STATE ---
   const [finderType, setFinderType] = useState<'Hospitals' | 'Police Stations'>('Hospitals');
   const finderData = finderType === 'Hospitals' ? HOSPITALS : POLICE_STATIONS;
 
-  // --- CONTACT VAULT STATE ---
-  interface Contact { id: string; name: string; relation: string; phone: string; }
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [showContactModal, setShowContactModal] = useState(false);
-  const [editingContact, setEditingContact] = useState<Contact | null>(null);
-
-  useEffect(() => {
-    const saved = localStorage.getItem('raksha_contacts');
-    if (saved) setContacts(JSON.parse(saved));
-  }, []);
-
-  const saveContacts = (newContacts: Contact[]) => {
-    setContacts(newContacts);
-    localStorage.setItem('raksha_contacts', JSON.stringify(newContacts));
-  };
-
-  const handleContactSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    const newContact = {
-      id: editingContact ? editingContact.id : Date.now().toString(),
-      name: fd.get('name') as string,
-      relation: fd.get('relation') as string,
-      phone: fd.get('phone') as string,
-    };
-    
-    if (editingContact) {
-      saveContacts(contacts.map(c => c.id === editingContact.id ? newContact : c));
-      toast.success('Contact updated');
-    } else {
-      saveContacts([...contacts, newContact]);
-      toast.success('Contact added');
-    }
-    setShowContactModal(false);
-    setEditingContact(null);
-  };
-
-  const exportContacts = () => {
-    const csv = "Name,Relationship,Phone\n" + contacts.map(c => `${c.name},${c.relation},${c.phone}`).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'emergency_contacts.csv';
-    a.click();
-    toast.success('Contacts exported successfully');
-  };
+  // (Contact Vault State Removed)
 
   // --- ANONYMOUS REPORT STATE ---
   const [reportCoords, setReportCoords] = useState<[number, number] | null>(null);
   const [urgency, setUrgency] = useState('Medium');
   const [reportSubmitted, setReportSubmitted] = useState<string | null>(null);
 
-  const LocationPicker = () => {
-    useMapEvents({
-      click(e) {
-        setReportCoords([e.latlng.lat, e.latlng.lng]);
-      }
-    });
-    return reportCoords ? <Marker position={reportCoords} /> : null;
-  };
-
   const handleReportSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setReportSubmitted(`CASE_${Math.floor(Math.random() * 10000)}`);
     toast.success('Anonymous report filed securely.');
+  };
+
+  // --- CRISIS REPORT STATE ---
+  const [crisisStep, setCrisisStep] = useState(1);
+  const [crisisType, setCrisisType] = useState('');
+  const [crisisDesc, setCrisisDesc] = useState('');
+  const [crisisLocation, setCrisisLocation] = useState('');
+  const [crisisCoords, setCrisisCoords] = useState<[number, number] | null>(null);
+  const [crisisSeverity, setCrisisSeverity] = useState<ReportSeverity>('Medium');
+  const [crisisAnon, setCrisisAnon] = useState(true);
+  const [crisisName, setCrisisName] = useState('');
+  const [crisisMediaNames, setCrisisMediaNames] = useState<string[]>([]);
+  const [crisisSubmitted, setCrisisSubmitted] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const names = files.map(f => f.name);
+    setCrisisMediaNames(prev => [...prev, ...names].slice(0, 5));
+    toast.success(`${files.length} file(s) attached`);
+  };
+
+  const handleCrisisSubmit = () => {
+    if (!crisisType) { toast.error('Please select a crisis type.'); return; }
+    if (!crisisDesc.trim()) { toast.error('Please provide a description.'); return; }
+    const report = reportStore.add({
+      type: crisisType,
+      description: crisisDesc,
+      location: crisisLocation || (crisisCoords ? `${crisisCoords[0].toFixed(4)}, ${crisisCoords[1].toFixed(4)}` : 'Unknown'),
+      coords: crisisCoords,
+      severity: crisisSeverity,
+      anonymous: crisisAnon,
+      reporterName: crisisAnon ? undefined : crisisName,
+      media: crisisMediaNames,
+    });
+    setCrisisSubmitted(report.caseRef);
+    toast.success('Crisis report submitted — visible in Admin Panel now!');
+  };
+
+  const resetCrisis = () => {
+    setCrisisStep(1); setCrisisType(''); setCrisisDesc(''); setCrisisLocation('');
+    setCrisisCoords(null); setCrisisSeverity('Medium'); setCrisisAnon(true);
+    setCrisisName(''); setCrisisMediaNames([]); setCrisisSubmitted(null);
   };
 
   // --- VOICE ASSISTANT STATE ---
@@ -165,8 +191,10 @@ export const PublicTools: React.FC = () => {
           <button 
             key={tab} 
             onClick={() => setActiveTab(tab)} 
-            className={`shrink-0 liquid-glass border rounded-lg px-5 py-2.5 text-sm font-medium transition-colors ${
-              activeTab === tab ? 'bg-white text-black border-white' : 'border-white/10 hover:bg-white/10 text-gray-300'
+            className={`shrink-0 border rounded-lg px-5 py-2.5 text-sm font-semibold transition-all ${
+              activeTab === tab
+                ? 'bg-white text-black border-white shadow-[0_0_15px_rgba(255,255,255,0.2)]'
+                : 'bg-white/[0.08] border-white/30 text-white hover:bg-white/20 hover:border-white/60'
             }`}
           >
             {tab}
@@ -183,7 +211,11 @@ export const PublicTools: React.FC = () => {
               <button 
                 key={type}
                 onClick={() => setFinderType(type as any)}
-                className={`px-4 py-2 rounded-lg text-sm transition-colors ${finderType === type ? 'bg-blue-600 text-white' : 'bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10'}`}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all border ${
+                  finderType === type
+                    ? 'bg-blue-500 text-white border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)]'
+                    : 'bg-white/[0.08] border-white/30 text-white hover:bg-white/20'
+                }`}
               >
                 {type}
               </button>
@@ -193,24 +225,23 @@ export const PublicTools: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-1 flex flex-col gap-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
               {finderData.map(loc => (
-                <div key={loc.id} className="liquid-glass border border-white/10 rounded-xl p-4 flex flex-col gap-2">
-                  <div className="flex justify-between items-start">
-                    <h3 className="font-medium text-white">{loc.name}</h3>
-                    <span className="text-[10px] px-2 py-1 bg-white/10 rounded font-mono text-gray-300 shrink-0">{loc.distance}</span>
+                <div key={loc.id} className="liquid-glass border border-white/10 rounded-xl p-4 flex flex-col gap-3">
+                  {/* Name + distance */}
+                  <div className="flex justify-between items-start gap-2">
+                    <h3 className="text-base font-semibold text-white leading-tight">{loc.name}</h3>
+                    <span className="text-[10px] px-2 py-1 bg-white/10 rounded-md font-mono text-white shrink-0 border border-white/10">{loc.distance}</span>
                   </div>
-                  <p className="text-xs text-gray-400">{loc.address}</p>
-                  <div className="flex items-center gap-2 text-xs mt-1">
-                    <Phone size={12} className="text-gray-500" /> {loc.phone}
-                    <span className="mx-1 text-gray-600">|</span>
-                    <span className={loc.open ? "text-green-400" : "text-red-400"}>{loc.open ? 'OPEN' : 'CLOSED'}</span>
-                  </div>
-                  <div className="flex gap-2 mt-3 pt-3 border-t border-white/5">
-                    <button className="flex-1 bg-white text-black hover:bg-gray-200 transition-colors text-xs rounded px-3 py-2 font-medium flex justify-center items-center gap-1">
-                      <Phone size={14} /> Call Now
-                    </button>
-                    <button className="flex-1 bg-white/10 hover:bg-white/20 transition-colors text-white text-xs rounded px-3 py-2 flex justify-center items-center gap-1">
-                      <Navigation size={14} /> Directions
-                    </button>
+                  <div className="flex flex-col gap-1.5 mt-1">
+                    {/* Address */}
+                    <p className="text-sm text-gray-200 leading-relaxed">{loc.address}</p>
+                    {/* Phone number */}
+                    <a 
+                      href={`tel:${loc.phone}`} 
+                      className="text-sm font-medium text-blue-400 hover:text-blue-300 flex items-center gap-2 transition-colors"
+                    >
+                      <Phone size={14} className="text-blue-400" />
+                      {loc.phone}
+                    </a>
                   </div>
                 </div>
               ))}
@@ -228,52 +259,267 @@ export const PublicTools: React.FC = () => {
         </FadeIn>
       )}
 
-      {activeTab === 'Contact Vault' && (
+      {/* Contact Vault Removed */}
+
+      {/* ══ CRISIS REPORT TAB ══ */}
+      {activeTab === 'Crisis Report' && (
         <FadeIn>
-          <div className="flex justify-between items-center mb-6">
-             <h2 className="text-lg font-medium">Emergency Contacts</h2>
-             <button onClick={exportContacts} className="flex items-center gap-2 text-sm bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-colors border border-white/5">
-               <Download size={16} /> Export CSV
-             </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {contacts.length === 0 && (
-              <div className="col-span-full p-8 text-center text-gray-500 border border-white/10 rounded-xl border-dashed">
-                No emergency contacts added yet. Click the + button to add one.
+          {crisisSubmitted ? (
+            <div className="flex flex-col items-center justify-center min-h-[400px] text-center gap-6">
+              <div className="w-20 h-20 rounded-full bg-green-500/20 border border-green-500/40 flex items-center justify-center">
+                <CheckCircle size={40} className="text-green-400" />
               </div>
-            )}
-            {contacts.map(contact => (
-              <div key={contact.id} className="liquid-glass border border-white/10 rounded-xl p-4 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-lg font-medium shrink-0 border border-blue-500/30">
-                  {contact.name.substring(0,2).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-white font-medium truncate">{contact.name}</h3>
-                  <div className="text-xs text-gray-400 mb-1">{contact.relation}</div>
-                  <div className="text-sm font-mono text-gray-300">{contact.phone}</div>
-                </div>
-                <div className="flex flex-col gap-2 shrink-0">
-                  <button onClick={() => { setEditingContact(contact); setShowContactModal(true); }} className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-md transition-colors">
-                    <Edit2 size={14} />
-                  </button>
-                  <button onClick={() => saveContacts(contacts.filter(c => c.id !== contact.id))} className="p-1.5 text-red-400 hover:text-white hover:bg-red-500/20 rounded-md transition-colors">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
+              <div>
+                <h3 className="text-2xl font-light mb-2 text-white">Report Submitted</h3>
+                <p className="text-gray-400 text-sm max-w-sm">Your report has been filed and is now visible to admins in real-time. Save your case reference below.</p>
               </div>
-            ))}
-          </div>
+              <div className="bg-white p-4 rounded-xl">
+                <QRCodeSVG value={crisisSubmitted} size={140} />
+              </div>
+              <div className="text-2xl font-mono tracking-widest bg-white/5 border border-white/10 px-8 py-4 rounded-xl text-white">
+                {crisisSubmitted}
+              </div>
+              <div className="flex gap-3">
+                <button onClick={resetCrisis} className="bg-white/10 hover:bg-white/20 transition-colors px-6 py-2.5 rounded-xl text-sm border border-white/10 text-white">
+                  Submit Another
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="max-w-3xl mx-auto">
+              {/* Progress Steps */}
+              <div className="flex items-center gap-2 mb-8">
+                {[1,2,3].map((s, i) => (
+                  <React.Fragment key={s}>
+                    <div className={`flex items-center gap-2 text-xs font-medium transition-colors ${
+                      crisisStep >= s ? 'text-white' : 'text-gray-600'
+                    }`}>
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${
+                        crisisStep > s ? 'bg-green-500 border-green-500 text-black' :
+                        crisisStep === s ? 'bg-white border-white text-black' :
+                        'bg-transparent border-white/20 text-gray-600'
+                      }`}>
+                        {crisisStep > s ? '✓' : s}
+                      </div>
+                      <span className="hidden sm:inline">{['Incident Details', 'Location & Media', 'Confirm & Submit'][i]}</span>
+                    </div>
+                    {i < 2 && <div className={`flex-1 h-px transition-colors ${crisisStep > s ? 'bg-green-500' : 'bg-white/10'}`} />}
+                  </React.Fragment>
+                ))}
+              </div>
 
-          {/* Floating Add Button */}
-          <button 
-            onClick={() => { setEditingContact(null); setShowContactModal(true); }}
-            className="fixed bottom-8 right-8 w-14 h-14 bg-white text-black rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:scale-105 transition-transform z-10"
-          >
-            <Plus size={24} />
-          </button>
+              {/* Step 1 — Incident Details */}
+              {crisisStep === 1 && (
+                <FadeIn className="space-y-6">
+                  <div>
+                    <label className="block text-xs text-gray-400 uppercase tracking-wider mb-4">Select Crisis Type</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {CRISIS_TYPES.map(ct => (
+                        <button
+                          key={ct.label}
+                          type="button"
+                          onClick={() => setCrisisType(ct.label)}
+                          className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all text-center ${
+                            crisisType === ct.label
+                              ? ct.bg + ' ' + ct.color
+                              : 'border-white/10 text-gray-400 hover:border-white/30 hover:bg-white/5'
+                          }`}
+                        >
+                          <ct.icon size={22} />
+                          <span className="text-xs font-medium leading-tight">{ct.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2">Description</label>
+                    <textarea
+                      rows={4}
+                      value={crisisDesc}
+                      onChange={e => setCrisisDesc(e.target.value)}
+                      placeholder="Describe what is happening in detail — number of people affected, timeline, visible hazards..."
+                      className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-white/30 resize-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-400 uppercase tracking-wider mb-3">Severity Level</label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {(['Low','Medium','High','Critical'] as ReportSeverity[]).map(level => (
+                        <button
+                          key={level}
+                          type="button"
+                          onClick={() => setCrisisSeverity(level)}
+                          className={`py-2.5 rounded-xl text-xs font-bold tracking-wider border-2 transition-all ${
+                            crisisSeverity === level
+                              ? level === 'Critical' ? 'bg-red-600 border-red-600 text-white shadow-[0_0_20px_rgba(239,68,68,0.4)]'
+                              : level === 'High'     ? 'bg-orange-500/30 border-orange-500 text-orange-300'
+                              : level === 'Medium'   ? 'bg-amber-500/30 border-amber-500 text-amber-300'
+                              :                        'bg-blue-500/30 border-blue-500 text-blue-300'
+                              : 'border-white/10 text-gray-500 hover:border-white/30'
+                          }`}
+                        >
+                          {level}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      if (!crisisType) { toast.error('Select a crisis type'); return; }
+                      if (!crisisDesc.trim()) { toast.error('Add a description'); return; }
+                      setCrisisStep(2);
+                    }}
+                    className="w-full bg-white text-black font-bold py-3.5 rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+                  >
+                    Continue <ChevronRight size={16} />
+                  </button>
+                </FadeIn>
+              )}
+
+              {/* Step 2 — Location & Media */}
+              {crisisStep === 2 && (
+                <FadeIn className="space-y-6">
+                  <div>
+                    <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2">Location Description</label>
+                    <input
+                      type="text"
+                      value={crisisLocation}
+                      onChange={e => setCrisisLocation(e.target.value)}
+                      placeholder="e.g. MG Road near Metro Station, or leave blank to use map pin"
+                      className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-white/30"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-gray-400 uppercase tracking-wider mb-2 flex justify-between">
+                      <span>Pin on Map <span className="normal-case text-gray-600">(optional)</span></span>
+                      {crisisCoords && <span className="text-green-400">📍 {crisisCoords[0].toFixed(4)}, {crisisCoords[1].toFixed(4)}</span>}
+                    </label>
+                    <div className="h-[280px] rounded-xl overflow-hidden border border-white/10 relative z-0">
+                      <MapContainer center={[12.9716, 77.5946]} zoom={12} style={{ height: '100%', width: '100%', background: '#0a0a0a' }}>
+                        <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
+                        <LocationPicker coords={crisisCoords} setCoords={setCrisisCoords} />
+                      </MapContainer>
+                      {!crisisCoords && (
+                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-[400] bg-black/20">
+                          <span className="bg-black/80 text-white px-4 py-2 rounded-full text-xs border border-white/10 flex items-center gap-2">
+                            <MapPin size={12} /> Click map to pin location
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2">Attach Media (Photos/Videos)</label>
+                    <input ref={fileRef} type="file" accept="image/*,video/*" multiple onChange={handleMediaUpload} className="hidden" />
+                    <button
+                      type="button"
+                      onClick={() => fileRef.current?.click()}
+                      className="w-full border-2 border-dashed border-white/20 rounded-xl py-6 flex flex-col items-center gap-2 text-gray-400 hover:border-white/40 hover:bg-white/5 transition-all"
+                    >
+                      <Upload size={24} />
+                      <span className="text-sm">Click to upload photos or videos</span>
+                      <span className="text-xs text-gray-600">JPG, PNG, MP4 — max 5 files</span>
+                    </button>
+                    {crisisMediaNames.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {crisisMediaNames.map((n, i) => (
+                          <div key={i} className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-gray-300">
+                            <Camera size={12} className="text-blue-400" /> {n}
+                            <button onClick={() => setCrisisMediaNames(p => p.filter((_, j) => j !== i))}><X size={10} /></button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button onClick={() => setCrisisStep(1)} className="flex-1 bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-medium transition-colors">
+                      Back
+                    </button>
+                    <button onClick={() => setCrisisStep(3)} className="flex-[2] bg-white text-black font-bold py-3 rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-2">
+                      Continue <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </FadeIn>
+              )}
+
+              {/* Step 3 — Review & Submit */}
+              {crisisStep === 3 && (
+                <FadeIn className="space-y-6">
+                  <div className="liquid-glass border border-white/10 rounded-2xl p-6 space-y-4">
+                    <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Review Your Report</h3>
+                    
+                    {[['Crisis Type', crisisType], ['Description', crisisDesc], ['Severity', crisisSeverity],
+                      ['Location', crisisLocation || (crisisCoords ? `${crisisCoords[0].toFixed(4)}, ${crisisCoords[1].toFixed(4)}` : 'Not specified')],
+                      ['Media', crisisMediaNames.length > 0 ? `${crisisMediaNames.length} file(s) attached` : 'None'],
+                    ].map(([label, value]) => (
+                      <div key={label} className="flex gap-4 text-sm border-b border-white/5 pb-3">
+                        <span className="text-gray-500 w-28 shrink-0">{label}</span>
+                        <span className={`text-white ${
+                          label === 'Severity'
+                            ? value === 'Critical' ? 'text-red-400 font-bold' : value === 'High' ? 'text-orange-400 font-bold' : value === 'Medium' ? 'text-amber-400' : 'text-blue-400'
+                            : ''
+                        }`}>{value}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="liquid-glass border border-white/10 rounded-2xl p-6">
+                    <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Identity</h3>
+                    <div className="flex gap-3 mb-4">
+                      <button
+                        onClick={() => setCrisisAnon(true)}
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-medium border-2 transition-all ${
+                          crisisAnon ? 'bg-white/10 border-white text-white' : 'border-white/10 text-gray-500 hover:border-white/30'
+                        }`}
+                      >
+                        🔒 Stay Anonymous
+                      </button>
+                      <button
+                        onClick={() => setCrisisAnon(false)}
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-medium border-2 transition-all ${
+                          !crisisAnon ? 'bg-white/10 border-white text-white' : 'border-white/10 text-gray-500 hover:border-white/30'
+                        }`}
+                      >
+                        👤 Provide Name
+                      </button>
+                    </div>
+                    {!crisisAnon && (
+                      <input
+                        type="text"
+                        value={crisisName}
+                        onChange={e => setCrisisName(e.target.value)}
+                        placeholder="Your full name (optional)"
+                        className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-white/30"
+                      />
+                    )}
+                    {crisisAnon && <p className="text-xs text-gray-500">Your IP and identity will be fully stripped before submission.</p>}
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button onClick={() => setCrisisStep(2)} className="flex-1 bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-medium transition-colors">
+                      Back
+                    </button>
+                    <button
+                      onClick={handleCrisisSubmit}
+                      className="flex-[2] bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(239,68,68,0.3)]"
+                    >
+                      <ShieldAlert size={16} /> Submit Crisis Report
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-center text-gray-600">Reports are instantly forwarded to the emergency admin panel and on-duty officers.</p>
+                </FadeIn>
+              )}
+            </div>
+          )}
         </FadeIn>
       )}
+
 
       {activeTab === 'Anonymous Report' && (
         <FadeIn>
@@ -329,7 +575,7 @@ export const PublicTools: React.FC = () => {
                     <div className="h-[250px] w-full rounded-lg overflow-hidden border border-white/10 relative z-0">
                       <MapContainer center={[12.9716, 77.5946]} zoom={12} style={{ height: '100%', width: '100%', background: '#0a0a0a' }}>
                         <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
-                        <LocationPicker />
+                        <LocationPicker coords={reportCoords} setCoords={setReportCoords} />
                       </MapContainer>
                       {!reportCoords && (
                          <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-[400] bg-black/20 backdrop-blur-[1px]">
@@ -347,10 +593,10 @@ export const PublicTools: React.FC = () => {
                           key={level}
                           type="button"
                           onClick={() => setUrgency(level)}
-                          className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors border ${
+                          className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all border ${
                             urgency === level 
                               ? (level === 'High' ? 'bg-red-500/20 text-red-400 border-red-500/50' : level === 'Medium' ? 'bg-amber-500/20 text-amber-400 border-amber-500/50' : 'bg-blue-500/20 text-blue-400 border-blue-500/50')
-                              : 'bg-black/30 border-white/5 text-gray-500 hover:bg-white/5'
+                              : 'bg-white/[0.06] border-white/20 text-white hover:bg-white/15'
                           }`}
                         >
                           {level}
@@ -437,41 +683,7 @@ export const PublicTools: React.FC = () => {
         </FadeIn>
       )}
 
-      {/* MODALS */}
-      <AnimatePresence>
-        {showContactModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="liquid-glass border border-white/10 rounded-2xl w-full max-w-md overflow-hidden relative"
-            >
-              <div className="p-5 border-b border-white/10 flex justify-between items-center bg-white/5">
-                <h3 className="font-medium text-lg">{editingContact ? 'Edit Contact' : 'Add Emergency Contact'}</h3>
-                <button onClick={() => setShowContactModal(false)} className="p-1 hover:bg-white/10 rounded-md transition-colors"><X size={18}/></button>
-              </div>
-              <form onSubmit={handleContactSubmit} className="p-6 flex flex-col gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs text-gray-400">Full Name</label>
-                  <input required name="name" defaultValue={editingContact?.name} type="text" className="bg-black/50 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-white/30" placeholder="e.g. John Doe" />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs text-gray-400">Relationship</label>
-                  <input required name="relation" defaultValue={editingContact?.relation} type="text" className="bg-black/50 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-white/30" placeholder="e.g. Brother, Friend" />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs text-gray-400">Phone Number</label>
-                  <input required name="phone" defaultValue={editingContact?.phone} type="tel" className="bg-black/50 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-white/30" placeholder="e.g. +91 9876543210" />
-                </div>
-                <button type="submit" className="mt-4 w-full bg-white text-black font-medium py-3 rounded-xl hover:bg-gray-200 transition-colors">
-                  {editingContact ? 'Save Changes' : 'Save Contact'}
-                </button>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      {/* MODALS REMOVED */}
 
     </div>
   );

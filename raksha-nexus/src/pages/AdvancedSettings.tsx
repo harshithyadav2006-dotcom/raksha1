@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { AnimatedHeading } from '../components/AnimatedHeading';
 import { FadeIn } from '../components/FadeIn';
-import { 
-  Crosshair, Battery, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Video, 
-  Watch, Activity, Heart, ShieldAlert, PhoneCall, Stethoscope, Umbrella, 
-  Wind, Car, Bus, Settings as SettingsIcon, Zap, Droplets, RefreshCw, X, BookOpen,
-  UploadCloud, Scan, AlertTriangle
+import {
+  Crosshair, Battery, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Video,
+  Heart, ShieldAlert, PhoneCall, Stethoscope, Umbrella,
+  Wind, Car, Bus, Settings as SettingsIcon, Zap, Droplets, RefreshCw, X, BookOpen
 } from 'lucide-react';
 import { MapContainer, TileLayer, Polyline, Marker } from 'react-leaflet';
 import L from 'leaflet';
@@ -15,7 +14,7 @@ import { jsPDF } from 'jspdf';
 import { QRCodeCanvas } from 'qrcode.react';
 
 // Leaflet default icon fix
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+delete (L.Icon.Default.prototype as { _getIconUrl?: unknown })._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
@@ -24,161 +23,14 @@ L.Icon.Default.mergeOptions({
 
 // --- SUB-COMPONENTS ---
 
-const DeepfakeDetector = () => {
-  const [file, setFile] = useState<File | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [result, setResult] = useState<any>(null);
-  const [registry, setRegistry] = useState<any[]>([]);
 
-  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-      setIsAnalyzing(true);
-      setProgress(0);
-      setResult(null);
-      
-      const interval = setInterval(() => {
-        setProgress(p => {
-          if (p >= 100) {
-            clearInterval(interval);
-            setIsAnalyzing(false);
-            const score = Math.floor(Math.random() * 40) + 40; // mock 40-80
-            setResult({
-              score,
-              confidence: 'High',
-              checks: [
-                { name: 'Metadata Consistency', pass: score > 50 },
-                { name: 'Facial Artifact Detection', pass: score > 60 },
-                { name: 'Audio-Visual Sync', pass: score > 55 },
-                { name: 'Compression Fingerprint', pass: score > 70 }
-              ]
-            });
-            return 100;
-          }
-          return p + 10;
-        });
-      }, 300);
-    }
-  };
-
-  const handleReport = () => {
-    if (!result || !file) return;
-    setRegistry(prev => [{
-      id: Date.now(),
-      time: new Date().toLocaleTimeString(),
-      filename: file.name,
-      score: result.score,
-      status: 'Logged for Review'
-    }, ...prev]);
-    toast.success('Reported to Misinformation Registry');
-    setResult(null);
-    setFile(null);
-  };
-
-  return (
-    <div className="liquid-glass border border-white/10 rounded-2xl p-6 mb-8">
-      <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
-        <h2 className="text-lg font-medium flex items-center gap-2"><Scan size={20} className="text-pink-400"/> Deepfake Misinformation Detection</h2>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div>
-          <label className="block text-xs text-gray-400 mb-2 uppercase tracking-wider">Upload Media for Analysis</label>
-          <div className="relative liquid-glass border border-dashed border-white/20 rounded-xl p-8 flex flex-col items-center justify-center text-center hover:bg-white/5 transition-colors cursor-pointer group">
-             <input type="file" accept="image/*,video/*" onChange={handleUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
-             <UploadCloud size={32} className="text-gray-400 mb-3 group-hover:text-pink-400 transition-colors" />
-             <div className="text-sm font-medium">{file ? file.name : "Drag & drop image or video"}</div>
-             <div className="text-xs text-gray-500 mt-1">Supports MP4, MOV, JPG, PNG</div>
-          </div>
-
-          {isAnalyzing && (
-            <div className="mt-6">
-              <div className="flex justify-between text-xs text-gray-400 font-mono mb-2">
-                <span>Analyzing Forensic Fingerprint...</span>
-                <span>{progress}%</span>
-              </div>
-              <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
-                <div className="bg-pink-500 h-full transition-all duration-300" style={{ width: `${progress}%` }}></div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div>
-          {result ? (
-            <FadeIn className="space-y-4">
-              <div className="flex items-center gap-6 mb-4">
-                 <div className="w-24 h-24 rounded-full border-4 flex flex-col items-center justify-center bg-black/50" style={{ borderColor: result.score < 60 ? '#ef4444' : '#22c55e' }}>
-                    <span className="text-3xl font-bold">{result.score}%</span>
-                 </div>
-                 <div>
-                    <div className="text-sm text-gray-400 uppercase tracking-wider mb-1">Authenticity Score</div>
-                    <div className="text-xs bg-white/10 px-2 py-1 rounded inline-block">Confidence: {result.confidence}</div>
-                 </div>
-              </div>
-
-              {result.score < 60 && (
-                <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-3 rounded-lg flex items-center gap-3 text-sm font-medium">
-                   <AlertTriangle size={18} /> LIKELY MANIPULATED — Do not share this content.
-                </div>
-              )}
-
-              <div className="space-y-2">
-                {result.checks.map((c: any, i: number) => (
-                  <div key={i} className="flex justify-between items-center text-sm p-2 bg-white/5 rounded border border-white/5">
-                    <span className="text-gray-300">{c.name}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded ${c.pass ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                      {c.pass ? 'PASS' : 'FAIL'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {result.score < 60 && (
-                <button onClick={handleReport} className="w-full mt-4 bg-red-600 hover:bg-red-500 transition-colors text-white py-2 rounded-lg font-medium text-sm flex items-center justify-center gap-2">
-                  <ShieldAlert size={16} /> Report Misinformation
-                </button>
-              )}
-            </FadeIn>
-          ) : (
-            <div className="h-full flex items-center justify-center text-gray-500 text-sm italic border border-dashed border-white/10 rounded-xl p-6 bg-black/20">
-               Upload media to see deepfake forensic analysis.
-            </div>
-          )}
-        </div>
-      </div>
-
-      {registry.length > 0 && (
-        <FadeIn className="mt-8 pt-6 border-t border-white/10">
-          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Misinformation Registry</h3>
-          <div className="space-y-2">
-             {registry.map(reg => (
-                <div key={reg.id} className="flex items-center justify-between p-3 bg-red-500/5 border border-red-500/20 rounded-lg text-sm">
-                   <div className="flex items-center gap-4">
-                     <span className="text-gray-500 font-mono text-xs">{reg.time}</span>
-                     <span className="text-white truncate max-w-[150px]">{reg.filename}</span>
-                   </div>
-                   <div className="flex items-center gap-4">
-                     <span className="text-red-400 font-mono text-xs">{reg.score}% Authentic</span>
-                     <span className="bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded text-[10px] uppercase">{reg.status}</span>
-                   </div>
-                </div>
-             ))}
-          </div>
-        </FadeIn>
-      )}
-    </div>
-  );
-};
 
 const AutoFIRGenerator = ({ onExit }: { onExit: () => void }) => {
   const [step, setStep] = useState(1);
   const [caseRef, setCaseRef] = useState('');
-  const [_mapPinned, _setMapPinned] = useState(false);
-  
+
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().slice(0,16),
+    date: new Date().toISOString().slice(0, 16),
     type: 'Theft / Burglary',
     location: '',
     description: '',
@@ -211,36 +63,36 @@ const AutoFIRGenerator = ({ onExit }: { onExit: () => void }) => {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(22);
     doc.text("FIRST INFORMATION REPORT", 105, 20, { align: "center" });
-    
+
     doc.setFontSize(12);
     doc.setFont("helvetica", "normal");
     let y = 40;
-    doc.text(`Case Reference: ${caseRef}`, 20, y); y+=10;
-    doc.text(`Date & Time: ${formData.date.replace('T', ' ')}`, 20, y); y+=10;
-    doc.text(`Incident Type: ${formData.type} (${formData.severity} Severity)`, 20, y); y+=10;
-    doc.text(`Location: ${formData.location || 'GPS Coordinates Pinned'}`, 20, y); y+=15;
-    
+    doc.text(`Case Reference: ${caseRef}`, 20, y); y += 10;
+    doc.text(`Date & Time: ${formData.date.replace('T', ' ')}`, 20, y); y += 10;
+    doc.text(`Incident Type: ${formData.type} (${formData.severity} Severity)`, 20, y); y += 10;
+    doc.text(`Location: ${formData.location || 'GPS Coordinates Pinned'}`, 20, y); y += 15;
+
     doc.setFont("helvetica", "bold");
-    doc.text("Description of Incident:", 20, y); y+=8;
+    doc.text("Description of Incident:", 20, y); y += 8;
     doc.setFont("helvetica", "normal");
     const splitDesc = doc.splitTextToSize(formData.description || 'No description provided.', 170);
     doc.text(splitDesc, 20, y);
     y += (splitDesc.length * 7) + 10;
-    
+
     doc.setFont("helvetica", "bold");
-    doc.text("Complainant Details:", 20, y); y+=8;
+    doc.text("Complainant Details:", 20, y); y += 8;
     doc.setFont("helvetica", "normal");
-    doc.text(`Name: ${formData.compName}`, 20, y); y+=8;
-    doc.text(`Contact: ${formData.compContact}`, 20, y); y+=8;
-    doc.text(`Address: ${formData.compAddress}`, 20, y); y+=15;
-    
+    doc.text(`Name: ${formData.compName}`, 20, y); y += 8;
+    doc.text(`Contact: ${formData.compContact}`, 20, y); y += 8;
+    doc.text(`Address: ${formData.compAddress}`, 20, y); y += 15;
+
     doc.setLineWidth(0.5);
-    doc.line(20, y, 190, y); y+=15;
-    
-    doc.text(`Officer in Charge: ${formData.officerName} (${formData.officerBadge})`, 20, y); y+=30;
+    doc.line(20, y, 190, y); y += 15;
+
+    doc.text(`Officer in Charge: ${formData.officerName} (${formData.officerBadge})`, 20, y); y += 30;
     doc.text("__________________________", 20, y);
-    doc.text("Authorized Signature", 20, y+8);
-    
+    doc.text("Authorized Signature", 20, y + 8);
+
     const qrCanvas = document.getElementById("fir-qr") as HTMLCanvasElement;
     if (qrCanvas) {
       doc.addImage(qrCanvas.toDataURL("image/png"), "PNG", 150, y - 20, 30, 30);
@@ -249,6 +101,7 @@ const AutoFIRGenerator = ({ onExit }: { onExit: () => void }) => {
     doc.save(`${caseRef}.pdf`);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateForm = (key: string, value: any) => {
     setFormData(prev => ({ ...prev, [key]: value }));
   };
@@ -258,7 +111,7 @@ const AutoFIRGenerator = ({ onExit }: { onExit: () => void }) => {
       <div className="max-w-3xl mx-auto w-full">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold uppercase tracking-widest text-white flex items-center gap-3">
-             Auto FIR Generator
+            Auto FIR Generator
           </h1>
           <button onClick={onExit} className="bg-white/10 hover:bg-white/20 p-2 rounded-lg transition-colors"><X size={20} /></button>
         </div>
@@ -368,21 +221,21 @@ const RuralEmergencyMode = ({ onExit }: { onExit: () => void }) => {
       </div>
 
       <div className="flex flex-col gap-6 flex-1 max-w-md mx-auto w-full justify-center">
-        <button 
+        <button
           onClick={() => handleAlert('Medical', 'Medical emergency activated. Help is on the way.')}
           className="w-full h-[120px] bg-red-600 rounded-3xl flex flex-col items-center justify-center gap-2 shadow-[0_10px_0_rgb(153,27,27)] active:translate-y-[10px] active:shadow-none transition-all"
         >
           <Stethoscope size={48} />
           <span className="text-xl font-bold uppercase tracking-widest">Medical</span>
         </button>
-        <button 
+        <button
           onClick={() => handleAlert('Safety', 'Safety threat registered. Alerting local community guards.')}
           className="w-full h-[120px] bg-amber-500 rounded-3xl flex flex-col items-center justify-center gap-2 shadow-[0_10px_0_rgb(180,83,9)] active:translate-y-[10px] active:shadow-none transition-all text-black"
         >
           <ShieldAlert size={48} />
           <span className="text-xl font-bold uppercase tracking-widest">Safety</span>
         </button>
-        <button 
+        <button
           onClick={() => handleAlert('Disaster', 'Natural disaster protocol initiated. Move to high ground.')}
           className="w-full h-[120px] bg-blue-600 rounded-3xl flex flex-col items-center justify-center gap-2 shadow-[0_10px_0_rgb(30,58,138)] active:translate-y-[10px] active:shadow-none transition-all"
         >
@@ -393,13 +246,13 @@ const RuralEmergencyMode = ({ onExit }: { onExit: () => void }) => {
         <div className="bg-white/5 border border-white/10 rounded-2xl p-5 mt-4">
           <h3 className="text-xs text-gray-400 uppercase tracking-widest mb-3">Nearest Health Worker</h3>
           <div className="flex items-center gap-4">
-             <div className="w-12 h-12 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center border border-green-500/30">
-               <PhoneCall size={20} />
-             </div>
-             <div>
-               <div className="font-medium">ASHA Worker: Asha Devi</div>
-               <div className="text-sm text-gray-400">Distance: 1.2 km</div>
-             </div>
+            <div className="w-12 h-12 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center border border-green-500/30">
+              <PhoneCall size={20} />
+            </div>
+            <div>
+              <div className="font-medium">ASHA Worker: Asha Devi</div>
+              <div className="text-sm text-gray-400">Distance: 1.2 km</div>
+            </div>
           </div>
         </div>
       </div>
@@ -424,62 +277,62 @@ const CampusSafetyMode = ({ onExit }: { onExit: () => void }) => {
           <div className="liquid-glass border border-white/10 rounded-2xl p-6 h-[400px] flex flex-col">
             <h2 className="text-sm font-semibold tracking-wider text-gray-400 mb-4 uppercase">Campus Map & Check-ins</h2>
             <div className="flex-1 bg-white/5 rounded-xl border border-white/10 relative overflow-hidden flex items-center justify-center">
-               <svg viewBox="0 0 800 400" className="w-full h-full opacity-50">
-                 <rect x="100" y="50" width="200" height="150" fill="none" stroke="white" strokeWidth="2" />
-                 <rect x="350" y="50" width="300" height="150" fill="none" stroke="white" strokeWidth="2" />
-                 <rect x="100" y="250" width="550" height="100" fill="none" stroke="white" strokeWidth="2" />
-                 <text x="200" y="130" fill="white" fontSize="14" textAnchor="middle">Library</text>
-                 <text x="500" y="130" fill="white" fontSize="14" textAnchor="middle">Science Block</text>
-                 <text x="375" y="305" fill="white" fontSize="14" textAnchor="middle">Main Ground</text>
-                 {/* Mock students */}
-                 <circle cx="250" cy="100" r="5" fill="#4ade80" className="animate-pulse" />
-                 <circle cx="450" cy="150" r="5" fill="#4ade80" className="animate-pulse" />
-                 <circle cx="600" cy="100" r="5" fill="#4ade80" className="animate-pulse" />
-                 <circle cx="150" cy="280" r="5" fill="#f87171" className="animate-pulse" />
-               </svg>
-               <div className="absolute top-4 right-4 bg-black/80 px-3 py-1 rounded text-xs border border-white/10 flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-green-500" /> 842 Checked In
-               </div>
+              <svg viewBox="0 0 800 400" className="w-full h-full opacity-50">
+                <rect x="100" y="50" width="200" height="150" fill="none" stroke="white" strokeWidth="2" />
+                <rect x="350" y="50" width="300" height="150" fill="none" stroke="white" strokeWidth="2" />
+                <rect x="100" y="250" width="550" height="100" fill="none" stroke="white" strokeWidth="2" />
+                <text x="200" y="130" fill="white" fontSize="14" textAnchor="middle">Library</text>
+                <text x="500" y="130" fill="white" fontSize="14" textAnchor="middle">Science Block</text>
+                <text x="375" y="305" fill="white" fontSize="14" textAnchor="middle">Main Ground</text>
+                {/* Mock students */}
+                <circle cx="250" cy="100" r="5" fill="#4ade80" className="animate-pulse" />
+                <circle cx="450" cy="150" r="5" fill="#4ade80" className="animate-pulse" />
+                <circle cx="600" cy="100" r="5" fill="#4ade80" className="animate-pulse" />
+                <circle cx="150" cy="280" r="5" fill="#f87171" className="animate-pulse" />
+              </svg>
+              <div className="absolute top-4 right-4 bg-black/80 px-3 py-1 rounded text-xs border border-white/10 flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-green-500" /> 842 Checked In
+              </div>
             </div>
           </div>
           <div className="liquid-glass border border-white/10 rounded-2xl p-6">
-             <h2 className="text-sm font-semibold tracking-wider text-gray-400 mb-4 uppercase">Class Schedule & Density</h2>
-             <div className="grid grid-cols-4 gap-2 text-center text-xs">
-                <div className="bg-white/10 p-2 rounded">09:00 - 10:00<br/><span className="text-green-400">Low Density</span></div>
-                <div className="bg-white/10 p-2 rounded">11:00 - 12:00<br/><span className="text-amber-400">Med Density</span></div>
-                <div className="bg-white/10 p-2 rounded">13:00 - 14:00<br/><span className="text-red-400">High Density</span></div>
-                <div className="bg-white/10 p-2 rounded">15:00 - 16:00<br/><span className="text-green-400">Low Density</span></div>
-             </div>
+            <h2 className="text-sm font-semibold tracking-wider text-gray-400 mb-4 uppercase">Class Schedule & Density</h2>
+            <div className="grid grid-cols-4 gap-2 text-center text-xs">
+              <div className="bg-white/10 p-2 rounded">09:00 - 10:00<br /><span className="text-green-400">Low Density</span></div>
+              <div className="bg-white/10 p-2 rounded">11:00 - 12:00<br /><span className="text-amber-400">Med Density</span></div>
+              <div className="bg-white/10 p-2 rounded">13:00 - 14:00<br /><span className="text-red-400">High Density</span></div>
+              <div className="bg-white/10 p-2 rounded">15:00 - 16:00<br /><span className="text-green-400">Low Density</span></div>
+            </div>
           </div>
         </div>
 
         <div className="flex flex-col gap-6">
           <div className="liquid-glass border border-white/10 rounded-2xl p-6">
-             <h2 className="text-sm font-semibold tracking-wider text-gray-400 mb-4 uppercase">Request Safe Walk</h2>
-             <p className="text-xs text-gray-400 mb-4">Request a campus security guard to escort you to your dorm or vehicle.</p>
-             <button onClick={() => toast.success('Guard requested. ETA 2 minutes.')} className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-2">
-               <ShieldAlert size={18} /> Request Guard Escort
-             </button>
+            <h2 className="text-sm font-semibold tracking-wider text-gray-400 mb-4 uppercase">Request Safe Walk</h2>
+            <p className="text-xs text-gray-400 mb-4">Request a campus security guard to escort you to your dorm or vehicle.</p>
+            <button onClick={() => toast.success('Guard requested. ETA 2 minutes.')} className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-2">
+              <ShieldAlert size={18} /> Request Guard Escort
+            </button>
           </div>
-          
+
           <div className="liquid-glass border border-white/10 rounded-2xl p-6 flex-1 flex flex-col overflow-hidden">
-             <h2 className="text-sm font-semibold tracking-wider text-gray-400 mb-4 uppercase flex items-center justify-between">
-                Campus Alerts <span className="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded">LIVE</span>
-             </h2>
-             <div className="flex-1 overflow-y-auto space-y-3" style={{ scrollbarWidth: 'none' }}>
-                <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl">
-                   <div className="text-xs text-red-400 font-medium mb-1">Unauthorized Entry Detected</div>
-                   <div className="text-[10px] text-gray-400">Gate 4 - Auto locked down.</div>
-                </div>
-                <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl">
-                   <div className="text-xs text-amber-400 font-medium mb-1">Lab Smoke Alarm</div>
-                   <div className="text-[10px] text-gray-400">Science Block Room 302. Evacuating.</div>
-                </div>
-                <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-xl">
-                   <div className="text-xs text-blue-400 font-medium mb-1">Lost Student Found</div>
-                   <div className="text-[10px] text-gray-400">ID: ST-8492 located at Library.</div>
-                </div>
-             </div>
+            <h2 className="text-sm font-semibold tracking-wider text-gray-400 mb-4 uppercase flex items-center justify-between">
+              Campus Alerts <span className="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded">LIVE</span>
+            </h2>
+            <div className="flex-1 overflow-y-auto space-y-3" style={{ scrollbarWidth: 'none' }}>
+              <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl">
+                <div className="text-xs text-red-400 font-medium mb-1">Unauthorized Entry Detected</div>
+                <div className="text-[10px] text-gray-400">Gate 4 - Auto locked down.</div>
+              </div>
+              <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl">
+                <div className="text-xs text-amber-400 font-medium mb-1">Lab Smoke Alarm</div>
+                <div className="text-[10px] text-gray-400">Science Block Room 302. Evacuating.</div>
+              </div>
+              <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-xl">
+                <div className="text-xs text-blue-400 font-medium mb-1">Lost Student Found</div>
+                <div className="text-[10px] text-gray-400">ID: ST-8492 located at Library.</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -497,7 +350,8 @@ export const AdvancedSettings: React.FC = () => {
   // Drone State
   const [isRecording, setIsRecording] = useState(false);
 
-  // Wearable State
+  // Wearable State (Removed from UI)
+  /*
   const [heartRate, setHeartRate] = useState(75);
   useEffect(() => {
     const t = setInterval(() => {
@@ -508,6 +362,7 @@ export const AdvancedSettings: React.FC = () => {
     }, 3000);
     return () => clearInterval(t);
   }, []);
+  */
 
   // Smart City APIs State
   const INITIAL_APIS = [
@@ -523,7 +378,7 @@ export const AdvancedSettings: React.FC = () => {
 
   const [apis, setApis] = useState(INITIAL_APIS);
   const [testingApiId, setTestingApiId] = useState<number | null>(null);
-  const [liveFeedLogs, setLiveFeedLogs] = useState<{time: string, msg: string}[]>([
+  const [liveFeedLogs, setLiveFeedLogs] = useState<{ time: string, msg: string }[]>([
     { time: new Date().toLocaleTimeString(), msg: 'System initialized. Listening to streams...' }
   ]);
 
@@ -540,7 +395,7 @@ export const AdvancedSettings: React.FC = () => {
   useEffect(() => {
     const t = setInterval(() => {
       const msgList = ['Traffic jam cleared at Hebbal', 'Camera 423 feed restored', 'Weather warning: Heavy rain incoming', 'Grid voltage spike detected'];
-      setLiveFeedLogs(prev => [{ time: new Date().toLocaleTimeString(), msg: msgList[Math.floor(Math.random()*msgList.length)] }, ...prev].slice(0, 10));
+      setLiveFeedLogs(prev => [{ time: new Date().toLocaleTimeString(), msg: msgList[Math.floor(Math.random() * msgList.length)] }, ...prev].slice(0, 10));
     }, 8000);
     return () => clearInterval(t);
   }, []);
@@ -560,20 +415,20 @@ export const AdvancedSettings: React.FC = () => {
         </FadeIn>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
-        
+      <div className="grid grid-cols-1 gap-8 mb-8">
+
         {/* DRONE SURVEILLANCE PANEL */}
         <FadeIn delay={300} className="flex flex-col gap-6">
           <div className="liquid-glass border border-white/10 rounded-2xl overflow-hidden">
             <div className="p-5 border-b border-white/10 flex items-center justify-between bg-black/40">
-              <h2 className="text-sm font-semibold tracking-wider flex items-center gap-2"><Crosshair size={16} className="text-teal-400"/> DRONE SURVEILLANCE</h2>
+              <h2 className="text-sm font-semibold tracking-wider flex items-center gap-2"><Crosshair size={16} className="text-teal-400" /> DRONE SURVEILLANCE</h2>
             </div>
-            
+
             {/* Primary Feed */}
             <div className="relative w-full h-[300px] bg-black overflow-hidden flex items-center justify-center group border-b border-white/10">
               {/* Scanline Animation */}
               <div className="absolute inset-0 pointer-events-none opacity-20 bg-[linear-gradient(to_bottom,transparent,rgba(255,255,255,0.4),transparent)] animate-[scanline_2s_linear_infinite]" style={{ backgroundSize: '100% 3px' }} />
-              
+
               {/* Green SVG Crosshair */}
               <svg className="absolute w-32 h-32 text-teal-500/50" viewBox="0 0 100 100">
                 <line x1="50" y1="20" x2="50" y2="40" stroke="currentColor" strokeWidth="1" />
@@ -588,156 +443,76 @@ export const AdvancedSettings: React.FC = () => {
 
               {/* Overlays */}
               <div className="absolute top-4 left-4 bg-black/80 px-3 py-1 rounded text-[10px] font-mono border border-white/20 text-white flex items-center gap-2">
-                 <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" /> LIVE FEED — DRONE 01
+                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" /> LIVE FEED — DRONE 01
               </div>
-              
+
               <div className="absolute top-4 right-4 flex flex-col gap-2 items-end">
-                 <div className="bg-black/80 px-3 py-1 rounded text-[10px] font-mono border border-white/20 text-teal-400">ALT: 124m</div>
-                 <div className="bg-black/80 px-3 py-1 rounded text-[10px] font-mono border border-white/20 text-green-400 flex items-center gap-1"><Battery size={10}/> 84%</div>
+                <div className="bg-black/80 px-3 py-1 rounded text-[10px] font-mono border border-white/20 text-teal-400">ALT: 124m</div>
+                <div className="bg-black/80 px-3 py-1 rounded text-[10px] font-mono border border-white/20 text-green-400 flex items-center gap-1"><Battery size={10} /> 84%</div>
               </div>
 
               {/* Controls */}
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-black/80 p-2 rounded-xl border border-white/20 opacity-0 group-hover:opacity-100 transition-opacity">
-                 <div className="grid grid-cols-3 gap-1">
-                   <div/>
-                   <button className="liquid-glass rounded-lg p-1.5 hover:bg-white/20"><ArrowUp size={14}/></button>
-                   <div/>
-                   <button className="liquid-glass rounded-lg p-1.5 hover:bg-white/20"><ArrowLeft size={14}/></button>
-                   <button className="liquid-glass rounded-lg p-1.5 hover:bg-white/20"><ArrowDown size={14}/></button>
-                   <button className="liquid-glass rounded-lg p-1.5 hover:bg-white/20"><ArrowRight size={14}/></button>
-                 </div>
-                 <div className="w-px h-8 bg-white/20" />
-                 <input type="range" className="w-24 accent-teal-500" title="Zoom" />
-                 <div className="w-px h-8 bg-white/20" />
-                 <button onClick={() => setIsRecording(!isRecording)} className={`liquid-glass rounded-lg p-2 flex items-center gap-2 transition-colors ${isRecording ? 'bg-red-500/20 text-red-400 border-red-500/50' : 'hover:bg-white/20'}`}>
-                   <Video size={14} className={isRecording ? 'animate-pulse' : ''} /> {isRecording ? 'REC' : 'Record'}
-                 </button>
+                <div className="grid grid-cols-3 gap-1">
+                  <div />
+                  <button className="liquid-glass rounded-lg p-1.5 hover:bg-white/20"><ArrowUp size={14} /></button>
+                  <div />
+                  <button className="liquid-glass rounded-lg p-1.5 hover:bg-white/20"><ArrowLeft size={14} /></button>
+                  <button className="liquid-glass rounded-lg p-1.5 hover:bg-white/20"><ArrowDown size={14} /></button>
+                  <button className="liquid-glass rounded-lg p-1.5 hover:bg-white/20"><ArrowRight size={14} /></button>
+                </div>
+                <div className="w-px h-8 bg-white/20" />
+                <input type="range" className="w-24 accent-teal-500" title="Zoom" />
+                <div className="w-px h-8 bg-white/20" />
+                <button onClick={() => setIsRecording(!isRecording)} className={`liquid-glass rounded-lg p-2 flex items-center gap-2 transition-colors ${isRecording ? 'bg-red-500/20 text-red-400 border-red-500/50' : 'hover:bg-white/20'}`}>
+                  <Video size={14} className={isRecording ? 'animate-pulse' : ''} /> {isRecording ? 'REC' : 'Record'}
+                </button>
               </div>
             </div>
 
             <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-               {/* Drone Fleet */}
-               <div className="space-y-3">
-                 {[1,2,3].map(id => (
-                   <div key={id} className="liquid-glass border border-white/10 rounded-lg p-3 flex justify-between items-center text-xs hover:bg-white/5 transition-colors">
-                      <div className="flex flex-col gap-1">
-                         <span className="font-medium text-white flex items-center gap-2">
-                           <Crosshair size={12} className={id===1 ? 'text-teal-400' : 'text-gray-500'}/> DRONE 0{id}
-                         </span>
-                         <span className="text-gray-400 font-mono text-[10px]">BAT: {100 - id*15}% | ALT: {120 - id*10}m</span>
-                      </div>
-                      <button className="bg-white/10 hover:bg-white/20 transition-colors px-3 py-1.5 rounded text-white">Deploy</button>
-                   </div>
-                 ))}
-               </div>
-               
-               {/* Mini Map */}
-               <div className="h-full min-h-[150px] rounded-lg overflow-hidden border border-white/10 relative z-0">
-                  <MapContainer center={[12.9716, 77.5946]} zoom={13} style={{ height: '100%', width: '100%', background: '#0a0a0a' }} zoomControl={false}>
-                    <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
-                    <Polyline 
-                      positions={[[12.9716, 77.5946], [12.98, 77.60], [12.99, 77.61]]}
-                      pathOptions={{ color: '#2dd4bf', weight: 2, dashArray: '5, 5', className: 'animate-pulse' }} 
-                    />
-                    <Marker position={[12.99, 77.61]} />
-                  </MapContainer>
-               </div>
+              {/* Drone Fleet */}
+              <div className="space-y-3">
+                {[1, 2, 3].map(id => (
+                  <div key={id} className="liquid-glass border border-white/10 rounded-lg p-3 flex justify-between items-center text-xs hover:bg-white/5 transition-colors">
+                    <div className="flex flex-col gap-1">
+                      <span className="font-medium text-white flex items-center gap-2">
+                        <Crosshair size={12} className={id === 1 ? 'text-teal-400' : 'text-gray-500'} /> DRONE 0{id}
+                      </span>
+                      <span className="text-gray-400 font-mono text-[10px]">BAT: {100 - id * 15}% | ALT: {120 - id * 10}m</span>
+                    </div>
+                    <button className="bg-white/10 hover:bg-white/20 transition-colors px-3 py-1.5 rounded text-white">Deploy</button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Mini Map */}
+              <div className="h-full min-h-[150px] rounded-lg overflow-hidden border border-white/10 relative z-0">
+                <MapContainer center={[12.9716, 77.5946]} zoom={13} style={{ height: '100%', width: '100%', background: '#0a0a0a' }} zoomControl={false}>
+                  <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
+                  <Polyline
+                    positions={[[12.9716, 77.5946], [12.98, 77.60], [12.99, 77.61]]}
+                    pathOptions={{ color: '#2dd4bf', weight: 2, dashArray: '5, 5', className: 'animate-pulse' }}
+                  />
+                  <Marker position={[12.99, 77.61]} />
+                </MapContainer>
+              </div>
             </div>
           </div>
         </FadeIn>
 
-        <div className="flex flex-col gap-8">
-          
-          {/* WEARABLE PANIC BAND */}
-          <FadeIn delay={400}>
-            <div className="liquid-glass border border-white/10 rounded-2xl p-6 relative overflow-hidden">
-              <h2 className="text-sm font-semibold tracking-wider flex items-center gap-2 mb-6"><Watch size={16} className="text-blue-400"/> WEARABLE PANIC BAND</h2>
-              
-              <div className="flex items-center gap-6 mb-6">
-                 {/* Device UI Mock */}
-                 <div className="w-24 h-32 rounded-[2rem] border-4 border-gray-800 bg-black flex flex-col items-center justify-center relative shadow-[0_0_20px_rgba(59,130,246,0.2)]">
-                    <div className="absolute top-2 w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                    <Heart size={20} className={heartRate > 120 ? 'text-red-500 animate-ping' : 'text-red-500'} />
-                    <span className="text-2xl font-bold mt-1 text-white">{heartRate}</span>
-                    <span className="text-[8px] text-gray-500 font-mono">BPM</span>
-                 </div>
-                 
-                 <div className="flex flex-col gap-3 flex-1">
-                    <div className="flex justify-between items-center text-sm border-b border-white/10 pb-2">
-                       <span className="text-gray-400">Connection</span>
-                       <span className="text-blue-400 font-medium">Paired</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm border-b border-white/10 pb-2">
-                       <span className="text-gray-400">Battery</span>
-                       <span className="text-green-400 font-mono">92%</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm pb-2">
-                       <span className="text-gray-400">Steps</span>
-                       <span className="text-white font-mono">4,230</span>
-                    </div>
-                 </div>
-              </div>
-
-              {heartRate > 120 && (
-                 <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex justify-between items-center mb-6 animate-[fadeIn_0.3s]">
-                    <div className="flex items-center gap-3">
-                       <Activity size={24} className="text-amber-400" />
-                       <div>
-                         <div className="text-sm font-medium text-amber-400">Stress Detected</div>
-                         <div className="text-xs text-amber-200/70">Elevated heart rate anomaly</div>
-                       </div>
-                    </div>
-                    <button onClick={() => toast.success('Guardians notified!')} className="bg-amber-500 hover:bg-amber-400 text-black px-4 py-2 rounded-lg text-xs font-medium transition-colors">Notify Guardians</button>
-                 </div>
-              )}
-
-              <div className="flex gap-3">
-                 <button onClick={() => toast.success('SOS Triggered manually!')} className="flex-1 bg-red-600/20 hover:bg-red-600/30 border border-red-500/40 text-red-400 py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-2">
-                   <ShieldAlert size={16} /> Manual Trigger SOS
-                 </button>
-                 <button className="bg-white/10 hover:bg-white/20 transition-colors px-4 py-3 rounded-xl text-sm font-medium text-white flex items-center justify-center">Pair New</button>
-              </div>
-            </div>
-          </FadeIn>
-
-          {/* MODE TOGGLES */}
-          <FadeIn delay={500} className="grid grid-cols-3 gap-4">
-             <button onClick={() => setIsFIRMode(true)} className="liquid-glass border border-white/10 hover:border-teal-500/50 transition-all rounded-2xl p-5 flex flex-col items-center justify-center gap-3 text-center group">
-               <div className="w-12 h-12 rounded-full bg-teal-500/10 flex items-center justify-center group-hover:bg-teal-500/20 transition-colors">
-                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-teal-400"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
-               </div>
-               <span className="font-medium text-sm">Auto FIR Generator</span>
-             </button>
-             <button onClick={() => setIsCampusMode(true)} className="liquid-glass border border-white/10 hover:border-blue-500/50 transition-all rounded-2xl p-5 flex flex-col items-center justify-center gap-3 text-center group">
-               <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500/20 transition-colors">
-                 <BookOpen size={24} className="text-blue-400" />
-               </div>
-               <span className="font-medium text-sm">Campus Safety Mode</span>
-             </button>
-             <button onClick={() => setIsRuralMode(true)} className="liquid-glass border border-white/10 hover:border-green-500/50 transition-all rounded-2xl p-5 flex flex-col items-center justify-center gap-3 text-center group">
-               <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center group-hover:bg-green-500/20 transition-colors">
-                 <Umbrella size={24} className="text-green-400" />
-               </div>
-               <span className="font-medium text-sm">Rural Emergency Mode</span>
-             </button>
-          </FadeIn>
-
-        </div>
       </div>
 
-      {/* DEEPFAKE DETECTOR */}
-      <FadeIn delay={600}>
-        <DeepfakeDetector />
-      </FadeIn>
+      {/* DEEPFAKE DETECTOR REMOVED */}
 
       {/* SMART CITY INTEGRATION APIs */}
       <FadeIn delay={700}>
         <div className="liquid-glass border border-white/10 rounded-2xl p-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-             <h2 className="text-lg font-medium flex items-center gap-2"><SettingsIcon size={20} className="text-purple-400"/> Smart City Integration APIs</h2>
-             <span className="text-xs bg-purple-500/20 text-purple-400 px-3 py-1.5 rounded-full border border-purple-500/30 font-mono uppercase tracking-wider flex items-center gap-2">
-               <div className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" /> Live Polling
-             </span>
+            <h2 className="text-lg font-medium flex items-center gap-2"><SettingsIcon size={20} className="text-purple-400" /> Smart City Integration APIs</h2>
+            <span className="text-xs bg-purple-500/20 text-purple-400 px-3 py-1.5 rounded-full border border-purple-500/30 font-mono uppercase tracking-wider flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" /> Live Polling
+            </span>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -755,7 +530,7 @@ export const AdvancedSettings: React.FC = () => {
                       <h3 className="text-sm font-medium text-white line-clamp-1">{api.name}</h3>
                       <div className="text-[10px] text-gray-500 mt-0.5 font-mono">Last Data: {api.time}</div>
                     </div>
-                    <button 
+                    <button
                       onClick={() => testConnection(api.id)}
                       disabled={isTesting}
                       className="mt-auto w-full bg-white/5 hover:bg-white/10 transition-colors py-2 rounded text-xs text-gray-300 flex items-center justify-center gap-2 border border-white/5"
@@ -767,14 +542,14 @@ export const AdvancedSettings: React.FC = () => {
                 )
               })}
             </div>
-            
+
             <div className="liquid-glass border border-white/10 rounded-xl p-4 flex flex-col overflow-hidden h-[300px] lg:h-auto">
               <h3 className="text-xs font-semibold tracking-wider text-gray-500 uppercase mb-3 border-b border-white/10 pb-3">Live Data Feed</h3>
               <div className="flex-1 overflow-y-auto space-y-3 pr-1" style={{ scrollbarWidth: 'none' }}>
                 {liveFeedLogs.map((log, i) => (
                   <div key={i} className="flex gap-3 text-xs animate-[fadeIn_0.3s_ease-out]">
-                     <span className="text-purple-400 font-mono shrink-0">{log.time}</span>
-                     <span className="text-gray-300">{log.msg}</span>
+                    <span className="text-purple-400 font-mono shrink-0">{log.time}</span>
+                    <span className="text-gray-300">{log.msg}</span>
                   </div>
                 ))}
               </div>
@@ -783,7 +558,8 @@ export const AdvancedSettings: React.FC = () => {
         </div>
       </FadeIn>
 
-      <style dangerouslySetInnerHTML={{__html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         @keyframes scanline {
           0% { transform: translateY(-100%); }
           100% { transform: translateY(100%); }

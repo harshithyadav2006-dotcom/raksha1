@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Flame, Heart, Monitor, Brain, Users, Wifi, Zap, Settings, Home, LogOut } from 'lucide-react';
+import { Flame, Heart, Monitor, Users, Wifi, Zap, Settings, Home, LogOut } from 'lucide-react';
 import { AIEmergencyChatbot } from './AIEmergencyChatbot';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -9,7 +9,6 @@ const NAV_ITEMS = [
   { icon: Flame, label: 'Crisis Response', path: '/crisis' },
   { icon: Heart, label: 'Women Safety', path: '/women-safety' },
   { icon: Monitor, label: 'Admin Panel', path: '/admin' },
-  { icon: Brain, label: 'AI Intelligence', path: '/ai-intelligence' },
   { icon: Users, label: 'Public Tools', path: '/public-tools' },
   { icon: Wifi, label: 'Offline & Mesh', path: '/offline' },
   { icon: Zap, label: 'Advanced', path: '/advanced' },
@@ -21,6 +20,10 @@ export const AppShell: React.FC = () => {
   const isDemoMode = false;
   const location = useLocation();
   const { user, signOut } = useAuth();
+
+  // On the admin page the panel has its own internal sidebar,
+  // so we hide the global one and let the page fill the full width.
+  const isAdminPage = location.pathname.startsWith('/admin');
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
@@ -42,34 +45,36 @@ export const AppShell: React.FC = () => {
       {/* Stronger dark overlay for inner pages so content is legible */}
       <div className="fixed inset-0 bg-black/70 z-[1]" />
       
-      {/* LEFT SIDEBAR */}
-      <nav className="!fixed top-0 left-0 h-screen w-16 hover:w-56 transition-all duration-300 liquid-glass border-r border-white/10 flex flex-col z-50 group overflow-hidden">
-        <div className="flex-1 flex flex-col gap-2 mt-16">
-          {NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname.startsWith(item.path);
-            return (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                className={`flex items-center gap-3 px-3 py-3 mx-2 rounded-lg transition-all ${
-                  isActive ? 'text-white bg-white/10' : 'text-gray-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <div className="shrink-0 px-1">
-                  <Icon size={22} strokeWidth={1.5} />
-                </div>
-                <span className="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 font-medium">
-                  {item.label}
-                </span>
-              </NavLink>
-            );
-          })}
-        </div>
-      </nav>
+      {/* LEFT SIDEBAR — hidden on admin page (admin has its own sidebar) */}
+      {!isAdminPage && (
+        <nav className="!fixed top-0 left-0 h-screen w-16 hover:w-56 transition-all duration-300 liquid-glass border-r border-white/10 flex flex-col z-50 group overflow-hidden">
+          <div className="flex-1 flex flex-col gap-2 mt-16">
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const isActive = location.pathname.startsWith(item.path);
+              return (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={`flex items-center gap-3 px-3 py-3 mx-2 rounded-lg transition-all ${
+                    isActive ? 'text-white bg-white/10' : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <div className="shrink-0 px-1">
+                    <Icon size={22} strokeWidth={1.5} />
+                  </div>
+                  <span className="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 font-medium">
+                    {item.label}
+                  </span>
+                </NavLink>
+              );
+            })}
+          </div>
+        </nav>
+      )}
 
-      {/* TOP STATUS BAR */}
-      <header className="!fixed top-0 left-16 right-0 h-12 liquid-glass border-b border-white/10 flex items-center justify-between px-6 z-40 transition-all duration-300">
+      {/* TOP STATUS BAR — full-width on admin page */}
+      <header className={`!fixed top-0 right-0 h-12 liquid-glass border-b border-white/10 flex items-center justify-between px-6 z-40 transition-all duration-300 ${isAdminPage ? 'left-0' : 'left-16'}`}>
         <NavLink to="/dashboard" className="flex items-center gap-3 group">
           <span className="text-sm font-medium tracking-widest text-white group-hover:text-teal-400 transition-colors">RAKSHA NEXUS</span>
           <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
@@ -118,11 +123,16 @@ export const AppShell: React.FC = () => {
         </div>
       </header>
 
-      {/* MAIN CONTENT — sits above the video overlay (z-[2]) */}
-      <main className="relative z-[2] ml-16 pt-12 flex-1 h-screen overflow-y-auto">
-        <div className="px-6 md:px-10 lg:px-16 py-8 min-h-full">
+      {/* MAIN CONTENT — full-width on admin page, sidebar-offset on others */}
+      <main className={`fixed top-12 right-0 bottom-0 z-[2] overflow-y-auto ${isAdminPage ? 'left-0' : 'left-16'}`}>
+        {isAdminPage ? (
+          // Admin page manages its own padding inside its layout
           <Outlet context={{ isDemoMode }} />
-        </div>
+        ) : (
+          <div className="px-6 md:px-10 lg:px-16 py-8 min-h-full">
+            <Outlet context={{ isDemoMode }} />
+          </div>
+        )}
       </main>
       <AIEmergencyChatbot />
     </div>

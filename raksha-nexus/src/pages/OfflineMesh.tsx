@@ -193,7 +193,7 @@ export const OfflineMesh: React.FC = () => {
                   <Hospital className="text-green-400" size={24} />
                   <div>
                     <div className="text-xs text-gray-400">Nearest Hospital</div>
-                    <div className="font-medium text-lg">Manipal Hosp (1.2km)</div>
+                    <div className="font-medium text-lg">Manipal Hosp (1.2km) · 080-2222-1111</div>
                   </div>
                 </div>
              </div>
@@ -202,7 +202,7 @@ export const OfflineMesh: React.FC = () => {
                   <ShieldAlert className="text-amber-400" size={24} />
                   <div>
                     <div className="text-xs text-gray-400">Nearest Police</div>
-                    <div className="font-medium text-lg">Indiranagar (0.8km)</div>
+                    <div className="font-medium text-lg">Indiranagar (0.8km) · 080-2294-2541</div>
                   </div>
                 </div>
              </div>
@@ -211,14 +211,14 @@ export const OfflineMesh: React.FC = () => {
           <div className="w-full max-w-md">
             <h3 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-widest">Emergency Contacts</h3>
             <div className="grid grid-cols-2 gap-3">
-              <button className="bg-white/10 border border-white/20 p-4 rounded-xl flex flex-col items-center gap-2 hover:bg-white/20 transition-colors">
+              <a href="tel:+919632630072" className="bg-white/10 border border-white/20 p-4 rounded-xl flex flex-col items-center gap-2 hover:bg-white/20 transition-colors text-center">
                 <Phone size={24} />
-                <span>Brother</span>
-              </button>
-              <button className="bg-white/10 border border-white/20 p-4 rounded-xl flex flex-col items-center gap-2 hover:bg-white/20 transition-colors">
+                <span>Brother (+91 96326 30072)</span>
+              </a>
+              <a href="tel:080-2294-2541" className="bg-white/10 border border-white/20 p-4 rounded-xl flex flex-col items-center gap-2 hover:bg-white/20 transition-colors text-center">
                 <Phone size={24} />
-                <span>Police (100)</span>
-              </button>
+                <span>Police (080-2294-2541)</span>
+              </a>
             </div>
           </div>
         </div>

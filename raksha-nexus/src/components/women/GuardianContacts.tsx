@@ -1,40 +1,109 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Phone, X, Plus, CheckCircle } from 'lucide-react';
+import { Phone, X, Plus, CheckCircle, MessageSquare } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-interface Guardian { id: number; name: string; relation: string; phone: string; notified?: string; }
+interface Guardian {
+  id: number;
+  name: string;
+  relation: string;
+  phone: string;
+  notified?: string;
+  notifiedVia?: 'SMS' | 'WhatsApp';
+}
 
 const INITIAL: Guardian[] = [
-  { id: 1, name: 'Meera Sharma', relation: 'Mother', phone: '+91 98765 43210' },
-  { id: 2, name: 'Raj Verma', relation: 'Brother', phone: '+91 91234 56789' },
-  { id: 3, name: 'Deepa Nair', relation: 'Friend', phone: '+91 80123 45678' },
+  { id: 1, name: 'Meera Sharma', relation: 'Mother', phone: '+91 87920 74989' },
+  { id: 2, name: 'Raj Verma', relation: 'Brother', phone: '+91 96326 30072' },
+  { id: 3, name: 'Suresh Nair', relation: 'Father', phone: '+91 81971 49231' },
 ];
 
 function initials(name: string) { return name.split(' ').map(n => n[0]).join('').toUpperCase(); }
 
 const COLORS = ['bg-purple-500/30 text-purple-300', 'bg-blue-500/30 text-blue-300', 'bg-green-500/30 text-green-300', 'bg-amber-500/30 text-amber-300'];
 
-interface Props { sosActive: boolean; }
+interface Props { sosActive: boolean; className?: string; }
 
-export const GuardianContacts: React.FC<Props> = ({ sosActive }) => {
-  const [guardians, setGuardians] = useState<Guardian[]>(INITIAL.map(g =>
-    sosActive ? { ...g, notified: new Date().toLocaleTimeString() } : g
-  ));
+export const GuardianContacts: React.FC<Props> = ({ sosActive, className = '' }) => {
+  const [guardians, setGuardians] = useState<Guardian[]>(() => {
+    const saved = localStorage.getItem('raksha_guardians');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return INITIAL.map(g =>
+      sosActive ? { ...g, notified: new Date().toLocaleTimeString(), notifiedVia: 'SMS' } : g
+    );
+  });
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ name: '', relation: '', phone: '' });
+
+  const coordsRef = React.useRef<{ lat: number; lng: number } | null>(null);
+
+  React.useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          coordsRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        },
+        (err) => console.error("Guardian GPS failed:", err)
+      );
+
+      const watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          coordsRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        },
+        (err) => console.error("Guardian GPS Watch failed:", err),
+        { enableHighAccuracy: true }
+      );
+      return () => navigator.geolocation.clearWatch(watchId);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    localStorage.setItem('raksha_guardians', JSON.stringify(guardians));
+  }, [guardians]);
 
   React.useEffect(() => {
     if (sosActive) {
       const now = new Date().toLocaleTimeString();
-      setGuardians(prev => prev.map(g => ({ ...g, notified: g.notified ?? now })));
+      setGuardians(prev => prev.map(g => ({ ...g, notified: g.notified ?? now, notifiedVia: g.notifiedVia ?? 'SMS' })));
     }
   }, [sosActive]);
 
-  const notify = (id: number) => {
+  const notify = (id: number, via: 'SMS' | 'WhatsApp') => {
     const now = new Date().toLocaleTimeString();
-    setGuardians(prev => prev.map(g => g.id === id ? { ...g, notified: now } : g));
-    toast.success('Guardian notified!', { style: { background: '#1a1a1a', border: '1px solid #22c55e', color: '#fff' } });
+    setGuardians(prev => prev.map(g => g.id === id ? { ...g, notified: now, notifiedVia: via } : g));
+    toast.success('Sent!', { id: 'sos-dispatch', style: { background: '#1a1a1a', border: '1px solid #22c55e', color: '#fff' } });
+  };
+
+  const handleSMS = (guardian: Guardian) => {
+    const baseMsg = `EMERGENCY SOS!\nI need help immediately! Alert from Raksha Women Safety.`;
+    const lat = coordsRef.current?.lat || 12.9716;
+    const lng = coordsRef.current?.lng || 77.5946;
+    const locStr = ` Location: https://maps.google.com/?q=${lat},${lng}`;
+    const text = `${baseMsg}${locStr}`;
+    const smsPhone = guardian.phone.replace(/[^0-9+]/g, '');
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const separator = isIOS ? '&' : '?';
+    const url = `sms:${smsPhone}${separator}body=${encodeURIComponent(text)}`;
+    window.location.href = url;
+    notify(guardian.id, 'SMS');
+  };
+
+  const handleWhatsApp = (guardian: Guardian) => {
+    const baseMsg = `EMERGENCY SOS!\nI need help immediately! Alert from Raksha Women Safety.`;
+    const lat = coordsRef.current?.lat || 12.9716;
+    const lng = coordsRef.current?.lng || 77.5946;
+    const locStr = `\nMy Live Location: https://maps.google.com/?q=${lat},${lng}`;
+    const text = `${baseMsg}${locStr}\nPlease contact/help me right away.`;
+    const cleanPhone = guardian.phone.replace(/[^0-9]/g, '');
+    const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+    notify(guardian.id, 'WhatsApp');
   };
 
   const addGuardian = (e: React.FormEvent) => {
@@ -47,7 +116,7 @@ export const GuardianContacts: React.FC<Props> = ({ sosActive }) => {
   };
 
   return (
-    <div className="liquid-glass border border-white/10 rounded-xl p-5">
+    <div className={`liquid-glass border border-white/10 rounded-xl p-5 flex flex-col ${className}`}>
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold tracking-wider flex items-center gap-2">
           <Phone size={14} className="text-blue-400" /> GUARDIAN CONTACTS
@@ -57,7 +126,7 @@ export const GuardianContacts: React.FC<Props> = ({ sosActive }) => {
         </button>
       </div>
 
-      <div className="flex flex-col gap-3 h-full justify-center">
+      <div className="flex flex-col gap-3 flex-1 justify-between">
         {guardians.map((g, i) => (
           <div key={g.id} className="liquid-glass border border-white/10 rounded-xl p-4 flex flex-col gap-3">
             <div className="flex items-center gap-3">
@@ -70,15 +139,32 @@ export const GuardianContacts: React.FC<Props> = ({ sosActive }) => {
               </div>
             </div>
             <div className="text-xs text-gray-400 font-mono">{g.phone}</div>
-            {g.notified ? (
-              <span className="flex items-center gap-1.5 text-[10px] font-bold text-green-400 bg-green-500/10 border border-green-500/30 px-2 py-1 rounded-lg">
-                <CheckCircle size={10} /> NOTIFIED · {g.notified}
-              </span>
-            ) : (
-              <button onClick={() => notify(g.id)} className="text-[11px] bg-white/10 hover:bg-white/20 rounded-lg py-1.5 text-white transition-colors font-medium">
-                Notify
-              </button>
-            )}
+            
+            <div className="flex flex-col gap-2">
+              {g.notified && (
+                <span className="flex items-center justify-center gap-1.5 text-[10px] font-bold text-green-400 bg-green-500/10 border border-green-500/30 px-2 py-1 rounded-lg">
+                  <CheckCircle size={10} /> SENT VIA {g.notifiedVia?.toUpperCase()} · {g.notified}
+                </span>
+              )}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleSMS(g)}
+                  className="flex-1 text-[11px] bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 rounded-lg py-1.5 transition-colors font-semibold border border-blue-500/30 flex items-center justify-center gap-1.5"
+                >
+                  <MessageSquare size={11} /> SMS
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleWhatsApp(g)}
+                  className="flex-1 text-[11px] bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 rounded-lg py-1.5 transition-colors font-semibold border border-emerald-500/30 flex items-center justify-center gap-1.5"
+                >
+                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current shrink-0">
+                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.588 1.451 5.407 1.452 5.54.004 10.05-4.505 10.054-10.045.002-2.684-1.038-5.207-2.93-7.098C17.29 1.57 14.768.53 12.013.53c-5.546 0-10.059 4.51-10.06 10.052-.001 1.83.48 3.62 1.39 5.2l-.998 3.64 3.713-.974zM17.47 14.39c-.3-.149-1.777-.878-2.076-.985-.299-.107-.517-.16-.735.168-.218.327-.843 1.066-1.034 1.285-.19.218-.38.244-.68.095-.3-.15-1.265-.467-2.41-1.485-.89-.794-1.492-1.775-1.667-2.074-.175-.3-.019-.462.13-.61.135-.133.3-.349.45-.523.15-.174.2-.299.3-.498.1-.2.05-.374-.025-.523-.075-.15-.735-1.77-1.007-2.422-.265-.636-.53-.55-.735-.56-.19-.008-.408-.01-.625-.01-.218 0-.573.082-.872.408-.3.326-1.144 1.116-1.144 2.72 0 1.605 1.169 3.159 1.33 3.376.162.218 2.299 3.51 5.568 4.922.778.336 1.385.537 1.857.687.781.248 1.49.213 2.052.129.626-.094 1.777-.727 2.025-1.429.248-.7.248-1.3 1.73-.149z" />
+                  </svg> WhatsApp
+                </button>
+              </div>
+            </div>
           </div>
         ))}
       </div>
